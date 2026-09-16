@@ -8,6 +8,7 @@ import Visit from '../models/Visit.js';
 import Therapy from '../models/Therapy.js';
 import Vaccination from '../models/Vaccination.js';
 import Appointment from '../models/Appointment.js';
+import ClinicRequest from '../models/ClinicRequest.js';
 import { isMongoConnected } from '../config/db.js';
 
 // In-Memory Database di fallback
@@ -19,7 +20,8 @@ let memoryData = {
   visits: [],
   therapies: [],
   vaccinations: [],
-  appointments: []
+  appointments: [],
+  clinicRequests: []
 };
 
 // Generatore ID univoci per il fallback in-memory (compatibili con stringhe ObjectId)
@@ -58,6 +60,7 @@ export const initSeedData = async () => {
       prontoSoccorso24h: true,
       coloreTema: '#0d9488',
       veterinari: [vetId],
+      creatoreId: vetId,
       createdAt: new Date().toISOString()
     },
     {
@@ -74,6 +77,7 @@ export const initSeedData = async () => {
       prontoSoccorso24h: false,
       coloreTema: '#0284c7',
       veterinari: [vetId],
+      creatoreId: vetId,
       createdAt: new Date().toISOString()
     }
   ];
@@ -424,6 +428,15 @@ export const initSeedData = async () => {
         await Appointment.insertMany(appointments);
         console.log('✅ MongoDB popolato con successo!');
       } else {
+        // Assicurati che le cliniche esistenti abbiano creatoreId impostato
+        const dbVet = await User.findOne({ email: 'dr.rossi@vetclinic.it' });
+        if (dbVet) {
+          await Clinic.updateMany(
+            { $or: [{ creatoreId: { $exists: false } }, { creatoreId: null }] },
+            { $set: { creatoreId: dbVet._id } }
+          );
+        }
+
         const vacCount = await Vaccination.countDocuments();
         const appCount = await Appointment.countDocuments();
         if (vacCount === 0 || appCount === 0) {
@@ -578,6 +591,7 @@ export const dataStore = {
     if (shouldUseMongo()) {
       const clinic = new Clinic({
         ...clinicData,
+        creatoreId: vetId || null,
         veterinari: vetId ? [vetId] : []
       });
       const saved = await clinic.save();
@@ -589,6 +603,7 @@ export const dataStore = {
     const newClinic = {
       _id: generateId(),
       ...clinicData,
+      creatoreId: vetId ? vetId.toString() : null,
       veterinari: vetId ? [vetId.toString()] : [],
       createdAt: new Date().toISOString()
     };
@@ -613,6 +628,283 @@ export const dataStore = {
     if (index === -1) return null;
     memoryData.clinics[index] = { ...memoryData.clinics[index], ...updateData };
     return memoryData.clinics[index];
+  },
+
+  // === RICHIESTE DI ACCESSO A SEDI ESISTENTI (CLINIC REQUESTS) ===
+  async getAvailableClinics(vetId, search = '') {
+    const userClinicIds = await this.getUserClinicIds(vetId);
+    let clinics = [];
+    if (shouldUseMongo()) {
+      const query = { _id: { $nin: userClinicIds } };
+      if (search) {
+        query.$or = [
+          { nome: { $regex: search, $options: 'i' } },
+          { citta: { $regex: search, $options: 'i' } },
+          { indirizzo: { $regex: search, $options: 'i' } }
+        ];
+      }
+      clinics = await Clinic.find(query).populate('creatoreId', 'nome cognome email');
+    } else {
+      clinics = (memoryData.clinics || []).filter((c) => !userClinicIds.includes(c._id.toString()));
+      if (search) {
+        const s = search.toLowerCase();
+        clinics = clinics.filter(
+          (c) =>
+            c.nome?.toLowerCase().includes(s) ||
+            c.citta?.toLowerCase().includes(s) ||
+            c.indirizzo?.toLowerCase().includes(s)
+        );
+      }
+      clinics = clinics.map((c) => {
+        const creatore = memoryData.users.find((u) => u._id.toString() === c.creatoreId?.toString());
+        return {
+          ...c,
+          creatoreId: creatore ? { nome: creatore.nome, cognome: creatore.cognome, email: creatore.email } : null
+        };
+      });
+    }
+
+    // Aggiungi informazione su richieste già inviate dall'utente per ciascuna clinica
+    const userRequests = await this.getMySentRequests(vetId);
+
+    return clinics.map((c) => {
+      const obj = c.toObject ? c.toObject() : { ...c };
+      const reqForThisClinic = userRequests.find(
+        (r) => (r.ambulatorioId?._id || r.ambulatorioId)?.toString() === obj._id.toString()
+      );
+      return {
+        ...obj,
+        richiestaEsistente: reqForThisClinic
+          ? {
+              _id: reqForThisClinic._id,
+              stato: reqForThisClinic.stato,
+              dataRichiesta: reqForThisClinic.dataRichiesta
+            }
+          : null
+      };
+    });
+  },
+
+  async createClinicRequest(vetId, { ambulatorioId, messaggio = '' }) {
+    if (!ambulatorioId) {
+      throw new Error("L'ID dell'ambulatorio è obbligatorio");
+    }
+
+    const clinic = await this.getClinicById(ambulatorioId);
+    if (!clinic) {
+      throw new Error('Ambulatorio non trovato');
+    }
+
+    const userClinicIds = await this.getUserClinicIds(vetId);
+    if (userClinicIds.includes(ambulatorioId.toString())) {
+      throw new Error('Fai già parte di questo ambulatorio');
+    }
+
+    if (shouldUseMongo()) {
+      const existing = await ClinicRequest.findOne({
+        ambulatorioId,
+        veterinarioId: vetId,
+        stato: 'IN_ATTESA'
+      });
+      if (existing) {
+        throw new Error('Hai già una richiesta di accesso in attesa per questo ambulatorio');
+      }
+
+      let gestoreId = clinic.creatoreId?._id || clinic.creatoreId;
+      if (!gestoreId && clinic.veterinari && clinic.veterinari.length > 0) {
+        gestoreId = clinic.veterinari[0]._id || clinic.veterinari[0];
+      }
+      if (!gestoreId) {
+        gestoreId = vetId;
+      }
+
+      const reqDoc = new ClinicRequest({
+        ambulatorioId,
+        veterinarioId: vetId,
+        gestoreId,
+        stato: 'IN_ATTESA',
+        messaggio: messaggio ? messaggio.trim() : '',
+        dataRichiesta: new Date()
+      });
+
+      const saved = await reqDoc.save();
+      return await ClinicRequest.findById(saved._id)
+        .populate('ambulatorioId')
+        .populate('gestoreId', 'nome cognome email');
+    }
+
+    memoryData.clinicRequests = memoryData.clinicRequests || [];
+    const existing = memoryData.clinicRequests.find(
+      (r) =>
+        r.ambulatorioId?.toString() === ambulatorioId.toString() &&
+        r.veterinarioId?.toString() === vetId.toString() &&
+        r.stato === 'IN_ATTESA'
+    );
+    if (existing) {
+      throw new Error('Hai già una richiesta di accesso in attesa per questo ambulatorio');
+    }
+
+    let gestoreId = clinic.creatoreId || (clinic.veterinari && clinic.veterinari[0]) || vetId;
+    const newReq = {
+      _id: generateId(),
+      ambulatorioId,
+      veterinarioId: vetId,
+      gestoreId,
+      stato: 'IN_ATTESA',
+      messaggio: messaggio ? messaggio.trim() : '',
+      dataRichiesta: new Date().toISOString(),
+      createdAt: new Date().toISOString()
+    };
+    memoryData.clinicRequests.push(newReq);
+    return { ...newReq, ambulatorioId: clinic };
+  },
+
+  async getMySentRequests(vetId) {
+    if (shouldUseMongo()) {
+      return await ClinicRequest.find({ veterinarioId: vetId })
+        .populate('ambulatorioId')
+        .populate('gestoreId', 'nome cognome email telefono')
+        .sort({ createdAt: -1 });
+    }
+    memoryData.clinicRequests = memoryData.clinicRequests || [];
+    const list = memoryData.clinicRequests.filter((r) => r.veterinarioId?.toString() === vetId.toString());
+    return list
+      .map((r) => {
+        const clinic = memoryData.clinics.find((c) => c._id.toString() === r.ambulatorioId?.toString());
+        const gestore = memoryData.users.find((u) => u._id.toString() === r.gestoreId?.toString());
+        return {
+          ...r,
+          ambulatorioId: clinic || r.ambulatorioId,
+          gestoreId: gestore ? { nome: gestore.nome, cognome: gestore.cognome, email: gestore.email } : r.gestoreId
+        };
+      })
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  },
+
+  async getReceivedRequests(vetId) {
+    if (shouldUseMongo()) {
+      const myClinics = await Clinic.find({
+        $or: [{ creatoreId: vetId }, { veterinari: vetId }]
+      }).select('_id');
+      const myClinicIds = myClinics.map((c) => c._id);
+
+      return await ClinicRequest.find({
+        $or: [{ gestoreId: vetId }, { ambulatorioId: { $in: myClinicIds } }]
+      })
+        .populate('veterinarioId', 'nome cognome email telefono codiceAlbo')
+        .populate('ambulatorioId')
+        .sort({ createdAt: -1 });
+    }
+
+    memoryData.clinicRequests = memoryData.clinicRequests || [];
+    const myClinicIds = (memoryData.clinics || [])
+      .filter((c) => c.creatoreId?.toString() === vetId.toString() || (c.veterinari || []).includes(vetId.toString()))
+      .map((c) => c._id.toString());
+
+    const list = memoryData.clinicRequests.filter(
+      (r) => r.gestoreId?.toString() === vetId.toString() || myClinicIds.includes(r.ambulatorioId?.toString())
+    );
+
+    return list
+      .map((r) => {
+        const clinic = memoryData.clinics.find((c) => c._id.toString() === r.ambulatorioId?.toString());
+        const vet = memoryData.users.find((u) => u._id.toString() === r.veterinarioId?.toString());
+        return {
+          ...r,
+          ambulatorioId: clinic || r.ambulatorioId,
+          veterinarioId: vet
+            ? {
+                _id: vet._id,
+                nome: vet.nome,
+                cognome: vet.cognome,
+                email: vet.email,
+                telefono: vet.telefono,
+                codiceAlbo: vet.codiceAlbo
+              }
+            : r.veterinarioId
+        };
+      })
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  },
+
+  async respondToClinicRequest(requestId, gestoreId, action, note = '') {
+    if (!['APPROVE', 'REJECT'].includes(action)) {
+      throw new Error("Azione non valida. Usa 'APPROVE' o 'REJECT'");
+    }
+
+    const newStatus = action === 'APPROVE' ? 'ACCETTATA' : 'RIFIUTATA';
+
+    if (shouldUseMongo()) {
+      const request = await ClinicRequest.findById(requestId);
+      if (!request) {
+        throw new Error('Richiesta non trovata');
+      }
+
+      const clinic = await Clinic.findById(request.ambulatorioId);
+      const isAuthorized =
+        request.gestoreId?.toString() === gestoreId.toString() ||
+        clinic?.creatoreId?.toString() === gestoreId.toString() ||
+        (clinic?.veterinari || []).some((v) => v.toString() === gestoreId.toString());
+
+      if (!isAuthorized) {
+        throw new Error('Non sei autorizzato a gestire questa richiesta di accesso');
+      }
+
+      request.stato = newStatus;
+      request.noteRisposta = note ? note.trim() : '';
+      request.dataRisposta = new Date();
+      await request.save();
+
+      if (action === 'APPROVE') {
+        const clinicId = clinic._id;
+        const vetId = request.veterinarioId;
+
+        // Aggiungi il veterinario alla clinica
+        await Clinic.findByIdAndUpdate(clinicId, {
+          $addToSet: { veterinari: vetId }
+        });
+
+        // Aggiungi la clinica al profilo del veterinario
+        await User.findByIdAndUpdate(vetId, {
+          $addToSet: { ambulatori: clinicId }
+        });
+      }
+
+      return await ClinicRequest.findById(requestId)
+        .populate('ambulatorioId')
+        .populate('veterinarioId', 'nome cognome email telefono codiceAlbo');
+    }
+
+    memoryData.clinicRequests = memoryData.clinicRequests || [];
+    const index = memoryData.clinicRequests.findIndex((r) => r._id.toString() === requestId.toString());
+    if (index === -1) {
+      throw new Error('Richiesta non trovata');
+    }
+
+    const request = memoryData.clinicRequests[index];
+    const clinic = memoryData.clinics.find((c) => c._id.toString() === request.ambulatorioId?.toString());
+
+    request.stato = newStatus;
+    request.noteRisposta = note ? note.trim() : '';
+    request.dataRisposta = new Date().toISOString();
+
+    if (action === 'APPROVE' && clinic) {
+      clinic.veterinari = clinic.veterinari || [];
+      const vetIdStr = request.veterinarioId.toString();
+      if (!clinic.veterinari.includes(vetIdStr)) {
+        clinic.veterinari.push(vetIdStr);
+      }
+      const user = memoryData.users.find((u) => u._id.toString() === vetIdStr);
+      if (user) {
+        user.ambulatori = user.ambulatori || [];
+        const clinicIdStr = clinic._id.toString();
+        if (!user.ambulatori.includes(clinicIdStr)) {
+          user.ambulatori.push(clinicIdStr);
+        }
+      }
+    }
+
+    return request;
   },
 
   // === PROPRIETARI (OWNERS) ===

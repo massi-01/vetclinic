@@ -43,7 +43,12 @@ export const api = {
     getAll: () => request('/clinics'),
     getById: (id) => request(`/clinics/${id}`),
     create: (data) => request('/clinics', { method: 'POST', body: data }),
-    update: (id, data) => request(`/clinics/${id}`, { method: 'PUT', body: data })
+    update: (id, data) => request(`/clinics/${id}`, { method: 'PUT', body: data }),
+    getAvailable: (search = '') => request(`/clinics/available${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+    sendRequest: (data) => request('/clinics/requests', { method: 'POST', body: data }),
+    getSentRequests: () => request('/clinics/requests/sent'),
+    getReceivedRequests: () => request('/clinics/requests/received'),
+    respondRequest: (id, data) => request(`/clinics/requests/${id}/respond`, { method: 'PUT', body: data })
   },
   owners: {
     getAll: (params = {}) => {

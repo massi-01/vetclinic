@@ -100,3 +100,100 @@ export const updateClinic = async (req, res) => {
     });
   }
 };
+
+export const getAvailableClinics = async (req, res) => {
+  try {
+    const { search } = req.query;
+    const clinics = await dataStore.getAvailableClinics(req.user._id, search);
+    res.json({
+      success: true,
+      data: clinics
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero degli ambulatori disponibili',
+      error: error.message
+    });
+  }
+};
+
+export const createClinicRequest = async (req, res) => {
+  try {
+    const { ambulatorioId, messaggio } = req.body;
+    if (!ambulatorioId) {
+      return res.status(400).json({
+        success: false,
+        message: "L'identificativo dell'ambulatorio è obbligatorio"
+      });
+    }
+
+    const request = await dataStore.createClinicRequest(req.user._id, { ambulatorioId, messaggio });
+    res.status(201).json({
+      success: true,
+      data: request,
+      message: "Richiesta d'accesso inviata con successo al gestore della struttura"
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message || "Errore durante l'invio della richiesta d'accesso"
+    });
+  }
+};
+
+export const getSentClinicRequests = async (req, res) => {
+  try {
+    const requests = await dataStore.getMySentRequests(req.user._id);
+    res.json({
+      success: true,
+      data: requests
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero delle richieste inviate',
+      error: error.message
+    });
+  }
+};
+
+export const getReceivedClinicRequests = async (req, res) => {
+  try {
+    const requests = await dataStore.getReceivedRequests(req.user._id);
+    res.json({
+      success: true,
+      data: requests
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Errore nel recupero delle richieste ricevute',
+      error: error.message
+    });
+  }
+};
+
+export const respondClinicRequest = async (req, res) => {
+  try {
+    const { action, note } = req.body;
+    if (!action || !['APPROVE', 'REJECT'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: "Azione non valida. Deve essere 'APPROVE' o 'REJECT'"
+      });
+    }
+
+    const request = await dataStore.respondToClinicRequest(req.params.id, req.user._id, action, note);
+    res.json({
+      success: true,
+      data: request,
+      message: action === 'APPROVE' ? 'Richiesta accettata con successo' : 'Richiesta rifiutata'
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Errore nella gestione della richiesta'
+    });
+  }
+};
