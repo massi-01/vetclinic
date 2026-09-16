@@ -77,7 +77,7 @@ export const ClinicFormModal = ({ isOpen, onClose, onClinicSaved, initialData = 
     }
   }, [isOpen, initialData]);
 
-  // Carica ambulatori disponibili quando si seleziona il tab "join"
+  // Carica ambulatori disponibili quando si seleziona il tab "join" o cambia searchQuery
   const loadAvailableClinics = async (search = '') => {
     try {
       setLoadingAvailable(true);
@@ -94,9 +94,12 @@ export const ClinicFormModal = ({ isOpen, onClose, onClinicSaved, initialData = 
 
   useEffect(() => {
     if (isOpen && activeTab === 'join' && !initialData) {
-      loadAvailableClinics(searchQuery);
+      const timer = setTimeout(() => {
+        loadAvailableClinics(searchQuery);
+      }, 200);
+      return () => clearTimeout(timer);
     }
-  }, [isOpen, activeTab]);
+  }, [isOpen, activeTab, searchQuery]);
 
   if (!isOpen) return null;
 
@@ -424,20 +427,39 @@ export const ClinicFormModal = ({ isOpen, onClose, onClinicSaved, initialData = 
               </form>
 
               {/* Lista Sedi Disponibili */}
-              <div style={{ maxHeight: '230px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: 'var(--slate-500)', fontWeight: '600' }}>
+                <span>Ambulatori registrati trovati ({availableClinics.length})</span>
+                {selectedClinicId && <span style={{ color: 'var(--primary)', fontWeight: '700' }}>Sede selezionata ✓</span>}
+              </div>
+
+              <div
+                style={{
+                  maxHeight: '320px',
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.6rem',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.65rem',
+                  backgroundColor: 'var(--slate-50)'
+                }}
+              >
                 {loadingAvailable ? (
-                  <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--slate-500)', fontSize: '0.85rem' }}>
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--slate-500)', fontSize: '0.85rem' }}>
                     Ricerca delle strutture in corso...
                   </div>
                 ) : availableClinics.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--slate-500)', fontSize: '0.85rem' }}>
-                    Nessun altro ambulatorio trovato. Verifica i termini di ricerca o creane uno nuovo.
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--slate-500)', fontSize: '0.85rem' }}>
+                    Nessun ambulatorio trovato. Modifica i termini di ricerca o creane uno nuovo dal tab precedente.
                   </div>
                 ) : (
                   availableClinics.map((clinic) => {
                     const isSelected = selectedClinicId === clinic._id;
+                    const isMember = clinic.giaAssociata;
                     const hasPending = clinic.richiestaEsistente?.stato === 'IN_ATTESA';
                     const hasRejected = clinic.richiestaEsistente?.stato === 'RIFIUTATA';
+                    const isClickable = !isMember && !hasPending;
                     const gestoreName = clinic.creatoreId ? `Dott. ${clinic.creatoreId.nome} ${clinic.creatoreId.cognome}` : 'Gestore della sede';
 
                     return (
@@ -445,46 +467,58 @@ export const ClinicFormModal = ({ isOpen, onClose, onClinicSaved, initialData = 
                         key={clinic._id}
                         id={`clinic-option-${clinic._id}`}
                         onClick={() => {
-                          if (!hasPending) {
+                          if (isClickable) {
                             setSelectedClinicId(clinic._id);
                             setError('');
                           }
                         }}
                         style={{
-                          padding: '0.75rem',
-                          borderRadius: 'var(--radius-md)',
+                          padding: '0.85rem 1rem',
+                          borderRadius: 'var(--radius-lg)',
                           border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-color)',
                           backgroundColor: isSelected ? 'var(--primary-light)' : '#ffffff',
-                          cursor: hasPending ? 'not-allowed' : 'pointer',
-                          opacity: hasPending ? 0.7 : 1,
+                          cursor: isClickable ? 'pointer' : 'not-allowed',
+                          opacity: isMember ? 0.75 : hasPending ? 0.7 : 1,
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '0.3rem',
+                          gap: '0.4rem',
+                          boxShadow: isSelected ? '0 2px 8px rgba(13, 148, 136, 0.15)' : 'none',
                           transition: 'all 0.15s ease'
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontWeight: '700', color: 'var(--slate-900)', fontSize: '0.95rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+                          <div style={{ fontWeight: '800', color: 'var(--slate-900)', fontSize: '0.98rem' }}>
                             {clinic.nome}
                           </div>
-                          {hasPending && (
+                          
+                          {isMember && (
+                            <span className="badge badge-status-active" style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem' }}>
+                              <CheckCircle2 size={11} /> Già associata al tuo profilo
+                            </span>
+                          )}
+                          {!isMember && hasPending && (
                             <span className="badge badge-warning" style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem' }}>
                               <Clock size={11} /> Richiesta Inviata (In attesa)
                             </span>
                           )}
-                          {hasRejected && (
+                          {!isMember && hasRejected && (
                             <span className="badge" style={{ backgroundColor: 'var(--rose-50)', color: 'var(--rose-600)', fontSize: '0.72rem' }}>
-                              Precedentemente Rifiutata
+                              Precedentemente Rifiutata (puoi riprovare)
+                            </span>
+                          )}
+                          {isClickable && !isSelected && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: '600' }}>
+                              Seleziona per richiedere accesso
                             </span>
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.78rem', color: 'var(--slate-500)' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <MapPin size={12} /> {clinic.indirizzo}, {clinic.citta}
+                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--slate-500)' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <MapPin size={13} /> {clinic.indirizzo}, {clinic.citta}
                           </span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <Phone size={12} /> {clinic.telefono}
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Phone size={13} /> {clinic.telefono}
                           </span>
                           <span style={{ fontWeight: '600', color: 'var(--slate-700)' }}>
                             Gestore: {gestoreName}

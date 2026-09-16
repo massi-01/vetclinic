@@ -532,6 +532,7 @@ export const dataStore = {
       const userAmbs = (user?.ambulatori || []).map((id) => id.toString());
       const clinics = await Clinic.find({
         $or: [
+          { creatoreId: vetId },
           { veterinari: vetId },
           { _id: { $in: userAmbs } }
         ]
@@ -543,6 +544,7 @@ export const dataStore = {
     return memoryData.clinics
       .filter(
         (c) =>
+          c.creatoreId?.toString() === vetIdStr ||
           (c.veterinari || []).map((v) => v.toString()).includes(vetIdStr) ||
           userAmbs.includes(c._id.toString())
       )
@@ -635,7 +637,7 @@ export const dataStore = {
     const userClinicIds = await this.getUserClinicIds(vetId);
     let clinics = [];
     if (shouldUseMongo()) {
-      const query = { _id: { $nin: userClinicIds } };
+      const query = {};
       if (search) {
         query.$or = [
           { nome: { $regex: search, $options: 'i' } },
@@ -643,9 +645,11 @@ export const dataStore = {
           { indirizzo: { $regex: search, $options: 'i' } }
         ];
       }
-      clinics = await Clinic.find(query).populate('creatoreId', 'nome cognome email');
+      clinics = await Clinic.find(query)
+        .populate('creatoreId', 'nome cognome email')
+        .sort({ nome: 1 });
     } else {
-      clinics = (memoryData.clinics || []).filter((c) => !userClinicIds.includes(c._id.toString()));
+      clinics = [...(memoryData.clinics || [])];
       if (search) {
         const s = search.toLowerCase();
         clinics = clinics.filter(
@@ -655,6 +659,7 @@ export const dataStore = {
             c.indirizzo?.toLowerCase().includes(s)
         );
       }
+      clinics.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
       clinics = clinics.map((c) => {
         const creatore = memoryData.users.find((u) => u._id.toString() === c.creatoreId?.toString());
         return {
@@ -669,11 +674,14 @@ export const dataStore = {
 
     return clinics.map((c) => {
       const obj = c.toObject ? c.toObject() : { ...c };
+      const clinicIdStr = obj._id.toString();
+      const isAlreadyMember = userClinicIds.includes(clinicIdStr);
       const reqForThisClinic = userRequests.find(
-        (r) => (r.ambulatorioId?._id || r.ambulatorioId)?.toString() === obj._id.toString()
+        (r) => (r.ambulatorioId?._id || r.ambulatorioId)?.toString() === clinicIdStr
       );
       return {
         ...obj,
+        giaAssociata: isAlreadyMember,
         richiestaEsistente: reqForThisClinic
           ? {
               _id: reqForThisClinic._id,
