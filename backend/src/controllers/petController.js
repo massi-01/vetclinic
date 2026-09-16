@@ -4,9 +4,39 @@ export const getPets = async (req, res) => {
   try {
     const { clinicId, search, specie, proprietarioId } = req.query;
     const pets = await dataStore.getPets(clinicId, { search, specie, proprietarioId });
+    const allVaccinations = await dataStore.getVaccinations(clinicId);
+
+    // Collega l'eventuale warning vaccinale per ciascun animale
+    const petsWithVaccineAlert = pets.map((p) => {
+      const petIdStr = (p._id || '').toString();
+      const petVacs = allVaccinations.filter((v) => (v.animaleId?._id || v.animaleId)?.toString() === petIdStr);
+      const expiredVac = petVacs.find((v) => v.statoWarning === 'SCADUTO');
+      const expiringVac = petVacs.find((v) => v.statoWarning === 'IN_SCADENZA');
+
+      let vaccineWarning = null;
+      if (expiredVac) {
+        vaccineWarning = {
+          stato: 'SCADUTO',
+          nomeVaccino: expiredVac.nomeVaccino,
+          giorni: expiredVac.scadutoDaGiorni || Math.abs(expiredVac.giorniAlRichiamo || 0)
+        };
+      } else if (expiringVac) {
+        vaccineWarning = {
+          stato: 'IN_SCADENZA',
+          nomeVaccino: expiringVac.nomeVaccino,
+          giorni: expiringVac.giorniAlRichiamo
+        };
+      }
+
+      return {
+        ...(p.toObject ? p.toObject() : p),
+        vaccineWarning
+      };
+    });
+
     res.json({
       success: true,
-      data: pets
+      data: petsWithVaccineAlert
     });
   } catch (error) {
     res.status(500).json({
@@ -27,16 +57,20 @@ export const getPetById = async (req, res) => {
       });
     }
 
-    // Carica anche le visite storiche e le terapie del paziente
+    // Carica visite, terapie e vaccinazioni del paziente
     const visits = await dataStore.getVisits(null, { petId: pet._id });
     const therapies = await dataStore.getTherapies(null, { petId: pet._id });
+    const vaccinations = await dataStore.getVaccinations(null, { petId: pet._id });
+
+    const petObj = pet.toObject ? pet.toObject() : pet;
 
     res.json({
       success: true,
       data: {
-        ...pet,
+        ...petObj,
         visite: visits,
-        terapie: therapies
+        terapie: therapies,
+        vaccinazioni: vaccinations
       }
     });
   } catch (error) {

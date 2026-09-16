@@ -1,13 +1,13 @@
 import React from 'react';
-import { LayoutDashboard, Dog, ClipboardList, Pill, Users, Building2 } from 'lucide-react';
+import { LayoutDashboard, Calendar, Dog, ClipboardList, Pill, Users, Building2 } from 'lucide-react';
 
 export const BottomNav = ({ currentTab, onTabChange }) => {
   const items = [
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
+    { id: 'agenda', label: 'Agenda', icon: Calendar },
     { id: 'pets', label: 'Pazienti', icon: Dog },
     { id: 'visits', label: 'Visite', icon: ClipboardList },
     { id: 'therapies', label: 'Terapie', icon: Pill },
-    { id: 'owners', label: 'Clienti', icon: Users },
     { id: 'clinics', label: 'Cliniche', icon: Building2 }
   ];
 

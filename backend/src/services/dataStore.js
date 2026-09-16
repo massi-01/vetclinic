@@ -6,6 +6,8 @@ import Owner from '../models/Owner.js';
 import Pet from '../models/Pet.js';
 import Visit from '../models/Visit.js';
 import Therapy from '../models/Therapy.js';
+import Vaccination from '../models/Vaccination.js';
+import Appointment from '../models/Appointment.js';
 import { isMongoConnected } from '../config/db.js';
 
 // In-Memory Database di fallback
@@ -15,7 +17,9 @@ let memoryData = {
   owners: [],
   pets: [],
   visits: [],
-  therapies: []
+  therapies: [],
+  vaccinations: [],
+  appointments: []
 };
 
 // Generatore ID univoci per il fallback in-memory (compatibili con stringhe ObjectId)
@@ -291,6 +295,107 @@ export const initSeedData = async () => {
     }
   ];
 
+  const vac1Id = generateId();
+  const vac2Id = generateId();
+  const vac3Id = generateId();
+
+  const vaccinations = [
+    {
+      _id: vac1Id,
+      nomeVaccino: 'Nobivac DHPPi + Lepto',
+      categoria: 'Core / Polivalente',
+      numeroLotto: 'B982A01',
+      dataSomministrazione: '2026-03-10',
+      dataRichiamo: '2027-03-10',
+      note: 'Buona tollerabilità, nessuna reazione avversa registrata.',
+      animaleId: pet1Id,
+      veterinarioId: vetId,
+      ambulatorioId: clinic1Id,
+      createdAt: new Date().toISOString()
+    },
+    {
+      _id: vac2Id,
+      nomeVaccino: 'Nobivac Tricat Trio',
+      categoria: 'Richiamo Annuale',
+      numeroLotto: 'C44109',
+      dataSomministrazione: '2025-08-15',
+      dataRichiamo: '2026-08-15',
+      note: 'Richiamo vaccinale annuale SCADUTO. Necessaria nuova somministrazione.',
+      animaleId: pet2Id,
+      veterinarioId: vetId,
+      ambulatorioId: clinic1Id,
+      createdAt: new Date().toISOString()
+    },
+    {
+      _id: vac3Id,
+      nomeVaccino: 'Cunivak RHD+Myxo',
+      categoria: 'Altro',
+      numeroLotto: 'R9910',
+      dataSomministrazione: '2025-09-28',
+      dataRichiamo: '2026-09-28',
+      note: 'Richiamo periodico imminente tra pochi giorni.',
+      animaleId: pet3Id,
+      veterinarioId: vetId,
+      ambulatorioId: clinic2Id,
+      createdAt: new Date().toISOString()
+    }
+  ];
+
+  const app1Id = generateId();
+  const app2Id = generateId();
+  const app3Id = generateId();
+
+  const appointments = [
+    {
+      _id: app1Id,
+      data: new Date().toISOString().split('T')[0],
+      oraInizio: '10:00',
+      oraFine: '10:30',
+      durataMinuti: 30,
+      tipoPrestazione: 'Visita Generale',
+      motivo: 'Controllo andatura e postura zampa anteriore',
+      stato: 'Confermato',
+      note: 'Il cane zoppica leggermente a freddo.',
+      animaleId: pet1Id,
+      proprietarioId: owner1Id,
+      veterinarioId: vetId,
+      ambulatorioId: clinic1Id,
+      createdAt: new Date().toISOString()
+    },
+    {
+      _id: app2Id,
+      data: new Date().toISOString().split('T')[0],
+      oraInizio: '11:30',
+      oraFine: '12:00',
+      durataMinuti: 30,
+      tipoPrestazione: 'Vaccinazione',
+      motivo: 'Richiamo vaccino annuale scaduto',
+      stato: 'In Attesa',
+      note: 'Cliente arrivato in sala d\'aspetto con trasportino.',
+      animaleId: pet2Id,
+      proprietarioId: owner2Id,
+      veterinarioId: vetId,
+      ambulatorioId: clinic1Id,
+      createdAt: new Date().toISOString()
+    },
+    {
+      _id: app3Id,
+      data: new Date().toISOString().split('T')[0],
+      oraInizio: '16:00',
+      oraFine: '16:45',
+      durataMinuti: 45,
+      tipoPrestazione: 'Controllo Post-Operatorio',
+      motivo: 'Ispezione usura dentale e pesata',
+      stato: 'Prenotato',
+      note: 'Controllo periodico coniglietto.',
+      animaleId: pet3Id,
+      proprietarioId: owner3Id,
+      veterinarioId: vetId,
+      ambulatorioId: clinic2Id,
+      createdAt: new Date().toISOString()
+    }
+  ];
+
   // Inizializza memoria
   memoryData = {
     users,
@@ -298,7 +403,9 @@ export const initSeedData = async () => {
     owners,
     pets,
     visits,
-    therapies
+    therapies,
+    vaccinations,
+    appointments
   };
 
   // Se MongoDB è connesso, verifichiamo e popoliamo se il database è vuoto
@@ -313,7 +420,49 @@ export const initSeedData = async () => {
         await Pet.insertMany(pets);
         await Visit.insertMany(visits);
         await Therapy.insertMany(therapies);
+        await Vaccination.insertMany(vaccinations);
+        await Appointment.insertMany(appointments);
         console.log('✅ MongoDB popolato con successo!');
+      } else {
+        const vacCount = await Vaccination.countDocuments();
+        const appCount = await Appointment.countDocuments();
+        if (vacCount === 0 || appCount === 0) {
+          const dbPets = await Pet.find();
+          const dbVet = await User.findOne();
+          if (dbPets.length > 0 && dbVet) {
+            if (vacCount === 0) {
+              const realVaccinations = dbPets.slice(0, 3).map((p, idx) => ({
+                nomeVaccino: idx === 0 ? 'Nobivac DHPPi + Lepto' : idx === 1 ? 'Nobivac Tricat Trio' : 'Cunivak RHD+Myxo',
+                categoria: idx === 0 ? 'Core / Polivalente' : idx === 1 ? 'Richiamo Annuale' : 'Altro',
+                numeroLotto: `LOT-${1000 + idx}`,
+                dataSomministrazione: idx === 1 ? '2025-08-15' : idx === 2 ? '2025-09-28' : '2026-03-10',
+                dataRichiamo: idx === 1 ? '2026-08-15' : idx === 2 ? '2026-09-28' : '2027-03-10',
+                note: idx === 1 ? 'Richiamo vaccinale scaduto da oltre 30 giorni.' : 'Controllo periodico.',
+                animaleId: p._id,
+                veterinarioId: dbVet._id,
+                ambulatorioId: p.ambulatorioId
+              }));
+              await Vaccination.insertMany(realVaccinations);
+            }
+            if (appCount === 0) {
+              const realAppointments = dbPets.slice(0, 3).map((p, idx) => ({
+                data: new Date().toISOString().split('T')[0],
+                oraInizio: idx === 0 ? '10:00' : idx === 1 ? '11:30' : '16:00',
+                oraFine: idx === 0 ? '10:30' : idx === 1 ? '12:00' : '16:45',
+                durataMinuti: idx === 2 ? 45 : 30,
+                tipoPrestazione: idx === 0 ? 'Visita Generale' : idx === 1 ? 'Vaccinazione' : 'Controllo Post-Operatorio',
+                motivo: idx === 0 ? 'Controllo andatura zampa' : idx === 1 ? 'Richiamo vaccino annuale' : 'Controllo peso e dentatura',
+                stato: idx === 0 ? 'Confermato' : idx === 1 ? 'In Attesa' : 'Prenotato',
+                animaleId: p._id,
+                proprietarioId: p.proprietarioId,
+                veterinarioId: dbVet._id,
+                ambulatorioId: p.ambulatorioId
+              }));
+              await Appointment.insertMany(realAppointments);
+            }
+            console.log('✅ Vaccinazioni e Appuntamenti agganciati e sincronizzati con successo su MongoDB!');
+          }
+        }
       }
     } catch (err) {
       console.error('⚠️ Errore nel popolamento seed di MongoDB:', err.message);
@@ -815,6 +964,228 @@ export const dataStore = {
     return memoryData.therapies.splice(index, 1)[0];
   },
 
+  // Helper calcolo stato richiamo vaccinale
+  computeVaccineWarning(dataRichiamo) {
+    if (!dataRichiamo) return { statoWarning: 'REGOLARE', giorniAlRichiamo: null };
+    const target = new Date(dataRichiamo);
+    const now = new Date();
+    target.setHours(0, 0, 0, 0);
+    now.setHours(0, 0, 0, 0);
+    const diffTime = target - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) {
+      return { statoWarning: 'SCADUTO', giorniAlRichiamo: diffDays, scadutoDaGiorni: Math.abs(diffDays) };
+    } else if (diffDays <= 30) {
+      return { statoWarning: 'IN_SCADENZA', giorniAlRichiamo: diffDays };
+    } else {
+      return { statoWarning: 'REGOLARE', giorniAlRichiamo: diffDays };
+    }
+  },
+
+  // === PIANO VACCINALE (VACCINATIONS) ===
+  async getVaccinations(clinicId = null, filters = {}) {
+    const { petId, warningOnly } = filters;
+    let list = [];
+
+    if (shouldUseMongo()) {
+      const query = {};
+      if (clinicId) query.ambulatorioId = clinicId;
+      if (petId) query.animaleId = petId;
+      const docs = await Vaccination.find(query).populate('animaleId').populate('veterinarioId').populate('ambulatorioId').sort({ dataRichiamo: 1 });
+      list = docs.map((d) => {
+        const obj = d.toObject();
+        const warning = this.computeVaccineWarning(obj.dataRichiamo);
+        return { ...obj, ...warning };
+      });
+    } else {
+      let filtered = [...memoryData.vaccinations];
+      if (clinicId) {
+        filtered = filtered.filter((v) => v.ambulatorioId.toString() === clinicId.toString());
+      }
+      if (petId) {
+        filtered = filtered.filter((v) => v.animaleId?.toString() === petId.toString());
+      }
+      filtered.sort((a, b) => new Date(a.dataRichiamo) - new Date(b.dataRichiamo));
+      list = filtered.map((v) => {
+        const pet = memoryData.pets.find((p) => p._id.toString() === v.animaleId?.toString());
+        const vet = memoryData.users.find((u) => u._id.toString() === v.veterinarioId?.toString());
+        const clinic = memoryData.clinics.find((c) => c._id.toString() === v.ambulatorioId?.toString());
+        const warning = this.computeVaccineWarning(v.dataRichiamo);
+        return {
+          ...v,
+          animaleId: pet || v.animaleId,
+          veterinarioId: vet ? { _id: vet._id, nome: vet.nome, cognome: vet.cognome } : v.veterinarioId,
+          ambulatorioId: clinic || v.ambulatorioId,
+          ...warning
+        };
+      });
+    }
+
+    if (warningOnly === 'true' || warningOnly === true) {
+      return list.filter((v) => v.statoWarning === 'SCADUTO' || v.statoWarning === 'IN_SCADENZA');
+    }
+    return list;
+  },
+
+  async getVaccinationById(id) {
+    if (shouldUseMongo()) {
+      const doc = await Vaccination.findById(id).populate('animaleId').populate('veterinarioId').populate('ambulatorioId');
+      if (!doc) return null;
+      const obj = doc.toObject();
+      return { ...obj, ...this.computeVaccineWarning(obj.dataRichiamo) };
+    }
+    const vac = memoryData.vaccinations.find((v) => v._id.toString() === id.toString());
+    if (!vac) return null;
+    const pet = memoryData.pets.find((p) => p._id.toString() === vac.animaleId?.toString());
+    const warning = this.computeVaccineWarning(vac.dataRichiamo);
+    return { ...vac, animaleId: pet || vac.animaleId, ...warning };
+  },
+
+  async createVaccination(vacData) {
+    if (shouldUseMongo()) {
+      const vac = new Vaccination(vacData);
+      const saved = await (await vac.save()).populate('animaleId');
+      const obj = saved.toObject();
+      return { ...obj, ...this.computeVaccineWarning(obj.dataRichiamo) };
+    }
+    const newVac = {
+      _id: generateId(),
+      ...vacData,
+      createdAt: new Date().toISOString()
+    };
+    memoryData.vaccinations.push(newVac);
+    const pet = memoryData.pets.find((p) => p._id.toString() === newVac.animaleId?.toString());
+    const warning = this.computeVaccineWarning(newVac.dataRichiamo);
+    return { ...newVac, animaleId: pet || newVac.animaleId, ...warning };
+  },
+
+  async updateVaccination(id, updateData) {
+    if (shouldUseMongo()) {
+      const updated = await Vaccination.findByIdAndUpdate(id, updateData, { new: true }).populate('animaleId');
+      if (!updated) return null;
+      const obj = updated.toObject();
+      return { ...obj, ...this.computeVaccineWarning(obj.dataRichiamo) };
+    }
+    const index = memoryData.vaccinations.findIndex((v) => v._id.toString() === id.toString());
+    if (index === -1) return null;
+    memoryData.vaccinations[index] = { ...memoryData.vaccinations[index], ...updateData };
+    const pet = memoryData.pets.find((p) => p._id.toString() === memoryData.vaccinations[index].animaleId?.toString());
+    const warning = this.computeVaccineWarning(memoryData.vaccinations[index].dataRichiamo);
+    return { ...memoryData.vaccinations[index], animaleId: pet || memoryData.vaccinations[index].animaleId, ...warning };
+  },
+
+  async deleteVaccination(id) {
+    if (shouldUseMongo()) {
+      return await Vaccination.findByIdAndDelete(id);
+    }
+    const index = memoryData.vaccinations.findIndex((v) => v._id.toString() === id.toString());
+    if (index === -1) return null;
+    return memoryData.vaccinations.splice(index, 1)[0];
+  },
+
+  // === AGENDA E APPUNTAMENTI (APPOINTMENTS) ===
+  async getAppointments(clinicId = null, filters = {}) {
+    const { data, petId, proprietarioId } = filters;
+    if (shouldUseMongo()) {
+      const query = {};
+      if (clinicId) query.ambulatorioId = clinicId;
+      if (data) query.data = data;
+      if (petId) query.animaleId = petId;
+      if (proprietarioId) query.proprietarioId = proprietarioId;
+
+      return await Appointment.find(query)
+        .populate('animaleId')
+        .populate('proprietarioId')
+        .populate('ambulatorioId')
+        .sort({ data: 1, oraInizio: 1 });
+    }
+
+    let list = [...memoryData.appointments];
+    if (clinicId) {
+      list = list.filter((a) => a.ambulatorioId.toString() === clinicId.toString());
+    }
+    if (data) {
+      list = list.filter((a) => a.data === data);
+    }
+    if (petId) {
+      list = list.filter((a) => a.animaleId?.toString() === petId.toString());
+    }
+    if (proprietarioId) {
+      list = list.filter((a) => a.proprietarioId?.toString() === proprietarioId.toString());
+    }
+    list.sort((a, b) => {
+      if (a.data !== b.data) return a.data.localeCompare(b.data);
+      return a.oraInizio.localeCompare(b.oraInizio);
+    });
+
+    return list.map((a) => {
+      const pet = memoryData.pets.find((p) => p._id.toString() === a.animaleId?.toString());
+      const owner = memoryData.owners.find((o) => o._id.toString() === a.proprietarioId?.toString());
+      const clinic = memoryData.clinics.find((c) => c._id.toString() === a.ambulatorioId?.toString());
+      return {
+        ...a,
+        animaleId: pet || a.animaleId,
+        proprietarioId: owner || a.proprietarioId,
+        ambulatorioId: clinic || a.ambulatorioId
+      };
+    });
+  },
+
+  async getAppointmentById(id) {
+    if (shouldUseMongo()) {
+      return await Appointment.findById(id).populate('animaleId').populate('proprietarioId').populate('ambulatorioId');
+    }
+    const app = memoryData.appointments.find((a) => a._id.toString() === id.toString());
+    if (!app) return null;
+    const pet = memoryData.pets.find((p) => p._id.toString() === app.animaleId?.toString());
+    const owner = memoryData.owners.find((o) => o._id.toString() === app.proprietarioId?.toString());
+    const clinic = memoryData.clinics.find((c) => c._id.toString() === app.ambulatorioId?.toString());
+    return {
+      ...app,
+      animaleId: pet || app.animaleId,
+      proprietarioId: owner || app.proprietarioId,
+      ambulatorioId: clinic || app.ambulatorioId
+    };
+  },
+
+  async createAppointment(appData) {
+    if (shouldUseMongo()) {
+      const app = new Appointment(appData);
+      return await (await app.save()).populate('animaleId');
+    }
+    const newApp = {
+      _id: generateId(),
+      stato: 'Prenotato',
+      ...appData,
+      createdAt: new Date().toISOString()
+    };
+    memoryData.appointments.push(newApp);
+    const pet = memoryData.pets.find((p) => p._id.toString() === newApp.animaleId?.toString());
+    const owner = memoryData.owners.find((o) => o._id.toString() === newApp.proprietarioId?.toString());
+    return { ...newApp, animaleId: pet || newApp.animaleId, proprietarioId: owner || newApp.proprietarioId };
+  },
+
+  async updateAppointment(id, updateData) {
+    if (shouldUseMongo()) {
+      return await Appointment.findByIdAndUpdate(id, updateData, { new: true }).populate('animaleId');
+    }
+    const index = memoryData.appointments.findIndex((a) => a._id.toString() === id.toString());
+    if (index === -1) return null;
+    memoryData.appointments[index] = { ...memoryData.appointments[index], ...updateData };
+    const pet = memoryData.pets.find((p) => p._id.toString() === memoryData.appointments[index].animaleId?.toString());
+    const owner = memoryData.owners.find((o) => o._id.toString() === memoryData.appointments[index].proprietarioId?.toString());
+    return { ...memoryData.appointments[index], animaleId: pet || memoryData.appointments[index].animaleId, proprietarioId: owner || memoryData.appointments[index].proprietarioId };
+  },
+
+  async deleteAppointment(id) {
+    if (shouldUseMongo()) {
+      return await Appointment.findByIdAndDelete(id);
+    }
+    const index = memoryData.appointments.findIndex((a) => a._id.toString() === id.toString());
+    if (index === -1) return null;
+    return memoryData.appointments.splice(index, 1)[0];
+  },
+
   // === STATISTICHE DASHBOARD ===
   async getDashboardStats(clinicId = null) {
     const today = new Date().toISOString().split('T')[0];
@@ -822,19 +1193,29 @@ export const dataStore = {
     const owners = await this.getOwners(clinicId);
     const visits = await this.getVisits(clinicId);
     const therapies = await this.getTherapies(clinicId, { attiva: true });
+    const vaccinations = await this.getVaccinations(clinicId);
+    const appointments = await this.getAppointments(clinicId, { data: today });
 
     const visitsToday = visits.filter((v) => {
       const vDate = typeof v.data === 'string' ? v.data.split('T')[0] : v.data?.toISOString().split('T')[0];
       return vDate === today;
     });
 
+    const vaccineWarnings = vaccinations.filter(
+      (v) => v.statoWarning === 'SCADUTO' || v.statoWarning === 'IN_SCADENZA'
+    );
+
     return {
       totalePazienti: pets.length,
       totaleProprietari: owners.length,
       visiteOggi: visitsToday.length,
       terapieAttive: therapies.length,
+      appuntamentiOggiCount: appointments.length,
+      vacciniWarningCount: vaccineWarnings.length,
       ultimeVisite: visits.slice(0, 5),
-      terapieInScadenza: therapies.slice(0, 5)
+      terapieInScadenza: therapies.slice(0, 5),
+      vacciniInScadenza: vaccineWarnings.slice(0, 6),
+      appuntamentiOggi: appointments
     };
   }
 };

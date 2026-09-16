@@ -138,6 +138,37 @@ export const swaggerDocument = {
           animaleId: { type: 'string', example: '6aaa45629d1acc0825e169b8' },
           ambulatorioId: { type: 'string', example: '6aaa45629d1acc0825e169b2' }
         }
+      },
+      Vaccination: {
+        type: 'object',
+        required: ['nomeVaccino', 'dataRichiamo', 'animaleId', 'ambulatorioId'],
+        properties: {
+          nomeVaccino: { type: 'string', example: 'Nobivac DHPPi + Lepto' },
+          categoria: { type: 'string', enum: ['Core / Polivalente', 'Richiamo Annuale', 'Antirabbica', 'Leishmaniosi', 'Altro'], example: 'Core / Polivalente' },
+          numeroLotto: { type: 'string', example: 'B982A01' },
+          dataSomministrazione: { type: 'string', format: 'date', example: '2026-03-10' },
+          dataRichiamo: { type: 'string', format: 'date', example: '2027-03-10' },
+          note: { type: 'string', example: 'Nessuna reazione avversa' },
+          animaleId: { type: 'string', example: '6aaa45629d1acc0825e169b8' },
+          ambulatorioId: { type: 'string', example: '6aaa45629d1acc0825e169b2' }
+        }
+      },
+      Appointment: {
+        type: 'object',
+        required: ['data', 'oraInizio', 'motivo', 'animaleId', 'ambulatorioId'],
+        properties: {
+          data: { type: 'string', format: 'date', example: '2026-09-16' },
+          oraInizio: { type: 'string', example: '10:00' },
+          oraFine: { type: 'string', example: '10:30' },
+          durataMinuti: { type: 'number', example: 30 },
+          tipoPrestazione: { type: 'string', enum: ['Visita Generale', 'Vaccinazione', 'Controllo Post-Operatorio', 'Chirurgia', 'Ecografia/Diagnostica', 'Altro'], example: 'Visita Generale' },
+          motivo: { type: 'string', example: 'Controllo andatura zampa anteriore' },
+          stato: { type: 'string', enum: ['Prenotato', 'In Attesa', 'In Visita', 'Completato', 'Annullato'], example: 'Prenotato' },
+          note: { type: 'string', example: 'Cliente accompagnato dal figlio' },
+          animaleId: { type: 'string', example: '6aaa45629d1acc0825e169b8' },
+          proprietarioId: { type: 'string', example: '6aaa45629d1acc0825e169b5' },
+          ambulatorioId: { type: 'string', example: '6aaa45629d1acc0825e169b2' }
+        }
       }
     }
   },
@@ -148,6 +179,8 @@ export const swaggerDocument = {
     { name: 'Pazienti', description: 'Cartella clinica e dati anagrafici degli animali' },
     { name: 'Visite', description: 'Diario visite, esami obiettivi e parametri vitali' },
     { name: 'Terapie', description: 'Prescrizione farmaci e posologia' },
+    { name: 'Vaccinazioni', description: 'Piano vaccinale, scadenze e allerta richiami periodici' },
+    { name: 'Agenda / Appuntamenti', description: 'Pianificazione appuntamenti su slot orari' },
     { name: 'Statistiche', description: 'Indicatori KPI per la dashboard clinica' }
   ],
   paths: {
@@ -423,6 +456,108 @@ export const swaggerDocument = {
         security: [{ BearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { 200: { description: 'Terapia eliminata' } }
+      }
+    },
+
+    '/api/vaccinations': {
+      get: {
+        tags: ['Vaccinazioni'],
+        summary: 'Elenco vaccinazioni con stato di scadenza richiamo calcolato',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: 'clinicId', in: 'query', schema: { type: 'string' } },
+          { name: 'petId', in: 'query', schema: { type: 'string' } },
+          { name: 'warningOnly', in: 'query', schema: { type: 'boolean' }, description: 'Mostra solo vaccini scaduti o in scadenza entro 30 giorni' }
+        ],
+        responses: { 200: { description: 'Elenco vaccinazioni' } }
+      },
+      post: {
+        tags: ['Vaccinazioni'],
+        summary: 'Registra nuova vaccinazione',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/Vaccination' } } }
+        },
+        responses: { 201: { description: 'Vaccinazione registrata con successo' } }
+      }
+    },
+    '/api/vaccinations/{id}': {
+      get: {
+        tags: ['Vaccinazioni'],
+        summary: 'Dettagli vaccinazione',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Dettaglio' } }
+      },
+      put: {
+        tags: ['Vaccinazioni'],
+        summary: 'Modifica vaccinazione',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/Vaccination' } } }
+        },
+        responses: { 200: { description: 'Aggiornata' } }
+      },
+      delete: {
+        tags: ['Vaccinazioni'],
+        summary: 'Rimuovi vaccinazione',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Eliminata' } }
+      }
+    },
+
+    '/api/appointments': {
+      get: {
+        tags: ['Agenda / Appuntamenti'],
+        summary: 'Elenco appuntamenti (filtrabili per giorno o paziente)',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: 'clinicId', in: 'query', schema: { type: 'string' } },
+          { name: 'data', in: 'query', schema: { type: 'string', format: 'date' }, description: 'Filtra per giorno (YYYY-MM-DD)' },
+          { name: 'petId', in: 'query', schema: { type: 'string' } }
+        ],
+        responses: { 200: { description: 'Elenco appuntamenti' } }
+      },
+      post: {
+        tags: ['Agenda / Appuntamenti'],
+        summary: 'Prenota un appuntamento nello slot orario desiderato',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/Appointment' } } }
+        },
+        responses: { 201: { description: 'Appuntamento creato con successo' } }
+      }
+    },
+    '/api/appointments/{id}': {
+      get: {
+        tags: ['Agenda / Appuntamenti'],
+        summary: 'Dettagli appuntamento',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Dettagli' } }
+      },
+      put: {
+        tags: ['Agenda / Appuntamenti'],
+        summary: 'Aggiorna appuntamento o stato (Prenotato, In Attesa, In Visita, Completato)',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/Appointment' } } }
+        },
+        responses: { 200: { description: 'Aggiornato' } }
+      },
+      delete: {
+        tags: ['Agenda / Appuntamenti'],
+        summary: 'Elimina o disdici appuntamento',
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Eliminato' } }
       }
     },
 

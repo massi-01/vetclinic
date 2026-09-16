@@ -84,6 +84,26 @@ export const api = {
     update: (id, data) => request(`/therapies/${id}`, { method: 'PUT', body: data }),
     delete: (id) => request(`/therapies/${id}`, { method: 'DELETE' })
   },
+  vaccinations: {
+    getAll: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/vaccinations${qs ? `?${qs}` : ''}`);
+    },
+    getById: (id) => request(`/vaccinations/${id}`),
+    create: (data) => request('/vaccinations', { method: 'POST', body: data }),
+    update: (id, data) => request(`/vaccinations/${id}`, { method: 'PUT', body: data }),
+    delete: (id) => request(`/vaccinations/${id}`, { method: 'DELETE' })
+  },
+  appointments: {
+    getAll: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/appointments${qs ? `?${qs}` : ''}`);
+    },
+    getById: (id) => request(`/appointments/${id}`),
+    create: (data) => request('/appointments', { method: 'POST', body: data }),
+    update: (id, data) => request(`/appointments/${id}`, { method: 'PUT', body: data }),
+    delete: (id) => request(`/appointments/${id}`, { method: 'DELETE' })
+  },
   stats: {
     getDashboard: (clinicId) => {
       const qs = clinicId ? `?clinicId=${clinicId}` : '';

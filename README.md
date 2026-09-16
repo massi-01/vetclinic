@@ -110,10 +110,20 @@ Il backend riconoscerà automaticamente la stringa e si connetterà a MongoDB. F
    - Prescrizione contestuale dei farmaci direttamente all'interno della visita.
 4. **Terapie & Farmaci**:
    - Controllo posologia, dosaggio, via di somministrazione e conteggio automatico dei giorni di trattamento rimanenti.
-5. **Anagrafica Clienti / Proprietari**:
+5. **Piano Vaccinale & Richiamo Periodico**:
+   - Tracciamento di ogni somministrazione vaccinale con tipologia (Core/Polivalente, Richiamo Annuale, Antirabbica, Leishmaniosi, ecc.) e tracciabilità numero lotto.
+   - Calcolo automatico della data di scadenza con pulsanti rapidi (+1 Anno, +3 Anni).
+   - Generazione di warning visivi automatici per richiami imminenti o scaduti (`⚠️ SCADUTO`, `⏳ IN SCADENZA`, `✅ REGOLARE`) visibili su PetCard, nella cartella clinica del paziente e nella Dashboard di riepilogo.
+6. **Calendario Interattivo & Agenda Visite**:
+   - Griglia oraria visuale continua dalle 08:30 alle 19:30 con slot ogni 30 minuti.
+   - Click rapido su qualsiasi slot orario disponibile per fissare l'appuntamento precompilato con paziente, proprietario e motivo.
+   - Monitoraggio sala d'attesa e flusso clinico in tempo reale (`Prenotato`, `Confermato`, `In Attesa`, `In Visita`, `Completato`, `Annullato`).
+   - Navigatore giornaliero e contatori istantanei delle presenze in sala e visite completate.
+7. **Anagrafica Clienti / Proprietari**:
    - Ricerca rapida per nome, recapito telefonico o codice fiscale.
    - Collegamento diretto con chiamata telefonica (`tel:`) o email (`mailto:`).
-6. **Esperienza Mobile-First**:
+8. **Esperienza Mobile-First & Cloud Ready**:
    - Navigazione a barra inferiore (Bottom Nav) pensata per l'uso con una sola mano su smartphone e tablet in corsia.
    - Layout adattivo con sidebar a scomparsa su desktop.
    - Predisposta come PWA installabile e compatibile con wrapper Capacitor/Cordova per iOS e Android.
+   - Connessione integrata a cluster cloud MongoDB Atlas e documentazione Swagger interattiva su `/api-docs`.

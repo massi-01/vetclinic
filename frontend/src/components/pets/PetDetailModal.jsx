@@ -16,7 +16,9 @@ import {
   Clock,
   User,
   MapPin,
-  CheckCircle
+  CheckCircle,
+  Syringe,
+  Trash2
 } from 'lucide-react';
 import { api } from '../../services/api';
 
@@ -26,25 +28,45 @@ export const PetDetailModal = ({
   petId,
   onEditPet,
   onNewVisit,
-  onNewTherapy
+  onNewTherapy,
+  onNewVaccination
 }) => {
   const [pet, setPet] = useState(null);
+  const [vaccinations, setVaccinations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('anagrafica'); // 'anagrafica', 'visite', 'terapie', 'peso'
+  const [activeTab, setActiveTab] = useState('anagrafica'); // 'anagrafica', 'visite', 'terapie', 'peso', 'vaccini'
   const [error, setError] = useState('');
 
   const loadPetDetails = async () => {
     if (!petId) return;
     try {
       setLoading(true);
-      const res = await api.pets.getById(petId);
-      if (res.success) {
-        setPet(res.data);
+      const [petRes, vacRes] = await Promise.all([
+        api.pets.getById(petId),
+        api.vaccinations.getAll({ petId })
+      ]);
+      if (petRes.success) {
+        setPet(petRes.data);
+      }
+      if (vacRes.success) {
+        setVaccinations(vacRes.data);
       }
     } catch (err) {
       setError(err.message || 'Errore nel caricamento cartella clinica');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteVaccination = async (id) => {
+    if (!window.confirm('Vuoi rimuovere questo vaccino dal registro?')) return;
+    try {
+      const res = await api.vaccinations.delete(id);
+      if (res.success) {
+        setVaccinations((prev) => prev.filter((v) => v._id !== id));
+      }
+    } catch (err) {
+      alert('Errore rimozione vaccino: ' + err.message);
     }
   };
 
@@ -146,6 +168,14 @@ export const PetDetailModal = ({
             >
               <TrendingUp size={15} style={{ display: 'inline', marginRight: '5px' }} />
               Curva Peso ({weightHistory.length})
+            </button>
+            <button
+              id="tab-btn-vaccini"
+              className={`tab-btn ${activeTab === 'vaccini' ? 'active' : ''}`}
+              onClick={() => setActiveTab('vaccini')}
+            >
+              <Syringe size={15} style={{ display: 'inline', marginRight: '5px' }} />
+              Vaccini ({vaccinations.length})
             </button>
           </div>
         </div>
@@ -433,6 +463,136 @@ export const PetDetailModal = ({
                   )}
                 </div>
               )}
+
+              {/* TAB 5: Piano Vaccinale & Richiami Periodici */}
+              {activeTab === 'vaccini' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div>
+                      <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: 'var(--slate-800)' }}>
+                        Libretto Sanitario & Piano Vaccinale
+                      </h3>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--slate-500)' }}>
+                        Controllo e gestione del ciclo di richiamo periodico
+                      </p>
+                    </div>
+                    <button
+                      id="btn-add-vaccination-from-details"
+                      className="btn btn-sm btn-primary"
+                      onClick={() => onNewVaccination && onNewVaccination(pet)}
+                    >
+                      <PlusCircle size={14} /> Registra Vaccino
+                    </button>
+                  </div>
+
+                  {/* Warning banner if any expired or expiring vaccine */}
+                  {vaccinations.some((v) => v.statoWarning === 'SCADUTO') && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--rose-50)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--rose-600)', fontSize: '0.85rem', fontWeight: '600' }}>
+                      <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                      <div>
+                        <strong>Attenzione:</strong> Uno o più richiami vaccinali sono scaduti! È opportuno provvedere alla somministrazione di un nuovo richiamo.
+                      </div>
+                    </div>
+                  )}
+
+                  {vaccinations.some((v) => v.statoWarning === 'IN_SCADENZA') && !vaccinations.some((v) => v.statoWarning === 'SCADUTO') && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--amber-50)', border: '1px solid rgba(245, 158, 11, 0.3)', color: 'var(--amber-700)', fontSize: '0.85rem', fontWeight: '600' }}>
+                      <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                      <div>
+                        <strong>Promemoria:</strong> Uno o più vaccini sono in scadenza entro i prossimi 30 giorni.
+                      </div>
+                    </div>
+                  )}
+
+                  {vaccinations.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--slate-400)', background: 'var(--slate-50)', borderRadius: 'var(--radius-lg)' }}>
+                      Nessuna vaccinazione registrata per questo paziente.
+                    </div>
+                  ) : (
+                    vaccinations.map((vac) => {
+                      const isScaduto = vac.statoWarning === 'SCADUTO';
+                      const isInScadenza = vac.statoWarning === 'IN_SCADENZA';
+                      const borderCol = isScaduto ? 'var(--rose-500)' : isInScadenza ? 'var(--amber-500)' : 'var(--emerald-500)';
+
+                      return (
+                        <div
+                          key={vac._id}
+                          className="card"
+                          style={{
+                            padding: '1rem',
+                            borderLeft: `4px solid ${borderCol}`
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <Syringe size={18} color={borderCol} />
+                              <h4 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--slate-900)' }}>
+                                {vac.nomeVaccino}
+                              </h4>
+                              <span className="badge badge-status-completed" style={{ fontSize: '0.72rem' }}>
+                                {vac.categoria}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              {isScaduto && (
+                                <span style={{ backgroundColor: 'var(--rose-50)', color: 'var(--rose-600)', border: '1px solid var(--rose-200)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', fontWeight: '700', fontSize: '0.75rem' }}>
+                                  ⚠️ SCADUTO {vac.scadutoDaGiorni ? `da ${vac.scadutoDaGiorni} gg` : ''}
+                                </span>
+                              )}
+                              {isInScadenza && (
+                                <span style={{ backgroundColor: 'var(--amber-50)', color: 'var(--amber-700)', border: '1px solid var(--amber-200)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', fontWeight: '700', fontSize: '0.75rem' }}>
+                                  ⏳ Scade tra {vac.giorniAlRichiamo} gg
+                                </span>
+                              )}
+                              {!isScaduto && !isInScadenza && (
+                                <span style={{ backgroundColor: 'var(--emerald-50)', color: 'var(--emerald-600)', border: '1px solid var(--emerald-200)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', fontWeight: '600', fontSize: '0.75rem' }}>
+                                  ✅ Valido ({vac.giorniAlRichiamo} gg rimanenti)
+                                </span>
+                              )}
+                              <button
+                                className="btn btn-icon btn-secondary"
+                                style={{ width: '28px', height: '28px', padding: 0, color: 'var(--rose-500)' }}
+                                onClick={() => handleDeleteVaccination(vac._id)}
+                                title="Elimina registrazione vaccino"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem', marginTop: '0.75rem', fontSize: '0.8rem', backgroundColor: 'var(--slate-50)', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)' }}>
+                            <div>
+                              <span style={{ color: 'var(--slate-400)', fontWeight: '600' }}>Somministrazione: </span>
+                              <strong style={{ color: 'var(--slate-800)' }}>
+                                {vac.dataSomministrazione ? new Date(vac.dataSomministrazione).toLocaleDateString('it-IT') : '-'}
+                              </strong>
+                            </div>
+                            <div>
+                              <span style={{ color: 'var(--slate-400)', fontWeight: '600' }}>Prossimo Richiamo: </span>
+                              <strong style={{ color: isScaduto ? 'var(--rose-600)' : isInScadenza ? 'var(--amber-600)' : 'var(--slate-800)' }}>
+                                {vac.dataRichiamo ? new Date(vac.dataRichiamo).toLocaleDateString('it-IT') : '-'}
+                              </strong>
+                            </div>
+                            {vac.numeroLotto && (
+                              <div>
+                                <span style={{ color: 'var(--slate-400)', fontWeight: '600' }}>Lotto: </span>
+                                <code style={{ fontSize: '0.75rem', background: '#ffffff', padding: '1px 4px', borderRadius: '3px' }}>{vac.numeroLotto}</code>
+                              </div>
+                            )}
+                          </div>
+
+                          {vac.note && (
+                            <div style={{ marginTop: '0.5rem', fontSize: '0.82rem', color: 'var(--slate-600)', fontStyle: 'italic' }}>
+                              Note: {vac.note}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -441,6 +601,13 @@ export const PetDetailModal = ({
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>
             Chiudi
+          </button>
+          <button
+            id="btn-quick-new-vaccine"
+            className="btn btn-secondary"
+            onClick={() => onNewVaccination && onNewVaccination(pet)}
+          >
+            <Syringe size={15} /> Registra Vaccino
           </button>
           <button
             id="btn-quick-new-visit"

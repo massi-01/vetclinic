@@ -8,6 +8,7 @@ import { VisitsPage } from './pages/VisitsPage';
 import { TherapiesPage } from './pages/TherapiesPage';
 import { OwnersPage } from './pages/OwnersPage';
 import { ClinicsPage } from './pages/ClinicsPage';
+import { AgendaPage } from './pages/AgendaPage';
 
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
@@ -19,6 +20,8 @@ import { VisitFormModal } from './components/visits/VisitFormModal';
 import { TherapyFormModal } from './components/therapies/TherapyFormModal';
 import { OwnerFormModal } from './components/owners/OwnerFormModal';
 import { ClinicFormModal } from './components/clinics/ClinicFormModal';
+import { VaccinationFormModal } from './components/vaccinations/VaccinationFormModal';
+import { AppointmentFormModal } from './components/appointments/AppointmentFormModal';
 
 import { Plus } from 'lucide-react';
 
@@ -47,6 +50,16 @@ const MainLayout = () => {
 
   const [isClinicFormOpen, setIsClinicFormOpen] = useState(false);
   const [clinicInitialData, setClinicInitialData] = useState(null);
+
+  const [isVaccinationFormOpen, setIsVaccinationFormOpen] = useState(false);
+  const [vaccinationDefaultPet, setVaccinationDefaultPet] = useState(null);
+  const [vaccinationInitialData, setVaccinationInitialData] = useState(null);
+
+  const [isAppointmentFormOpen, setIsAppointmentFormOpen] = useState(false);
+  const [appointmentDefaultDate, setAppointmentDefaultDate] = useState(null);
+  const [appointmentDefaultTime, setAppointmentDefaultTime] = useState(null);
+  const [appointmentDefaultPet, setAppointmentDefaultPet] = useState(null);
+  const [appointmentInitialData, setAppointmentInitialData] = useState(null);
 
   const [petFilterOwnerId, setPetFilterOwnerId] = useState(null);
 
@@ -125,6 +138,34 @@ const MainLayout = () => {
     setIsClinicFormOpen(true);
   };
 
+  const handleOpenNewVaccination = (pet = null) => {
+    setVaccinationInitialData(null);
+    setVaccinationDefaultPet(pet);
+    setIsVaccinationFormOpen(true);
+  };
+
+  const handleEditVaccination = (vac) => {
+    setVaccinationInitialData(vac);
+    setVaccinationDefaultPet(vac.animaleId);
+    setIsVaccinationFormOpen(true);
+  };
+
+  const handleOpenNewAppointment = (options = {}) => {
+    setAppointmentInitialData(null);
+    setAppointmentDefaultDate(options?.date || null);
+    setAppointmentDefaultTime(options?.time || null);
+    setAppointmentDefaultPet(options?.pet || null);
+    setIsAppointmentFormOpen(true);
+  };
+
+  const handleEditAppointment = (apt) => {
+    setAppointmentInitialData(apt);
+    setAppointmentDefaultDate(apt.data || null);
+    setAppointmentDefaultTime(apt.oraInizio || null);
+    setAppointmentDefaultPet(apt.animaleId || null);
+    setIsAppointmentFormOpen(true);
+  };
+
   const handleFilterPetsByOwner = (owner) => {
     setPetFilterOwnerId(owner._id);
     setCurrentTab('pets');
@@ -160,7 +201,17 @@ const MainLayout = () => {
               onNewPet={handleOpenNewPet}
               onNewOwner={handleOpenNewOwner}
               onNewTherapy={handleOpenNewTherapy}
+              onNewAppointment={handleOpenNewAppointment}
+              onNewVaccination={handleOpenNewVaccination}
               onSelectPet={handleOpenPetDetail}
+            />
+          )}
+
+          {currentTab === 'agenda' && (
+            <AgendaPage
+              onSelectPet={handleOpenPetDetail}
+              onNewAppointment={handleOpenNewAppointment}
+              onEditAppointment={handleEditAppointment}
             />
           )}
 
@@ -234,7 +285,6 @@ const MainLayout = () => {
         defaultOwnerId={petFormDefaultOwnerId}
         onPetSaved={(savedPet) => {
           if (selectedPetId === savedPet._id) {
-            // refresh
             setSelectedPetId(savedPet._id);
           }
         }}
@@ -247,6 +297,7 @@ const MainLayout = () => {
         onEditPet={handleEditPet}
         onNewVisit={handleOpenNewVisit}
         onNewTherapy={handleOpenNewTherapy}
+        onNewVaccination={handleOpenNewVaccination}
       />
 
       <VisitFormModal
@@ -254,9 +305,7 @@ const MainLayout = () => {
         onClose={() => setIsVisitFormOpen(false)}
         defaultPet={visitDefaultPet}
         initialData={visitInitialData}
-        onVisitSaved={() => {
-          // If modal for this pet is open, refresh
-        }}
+        onVisitSaved={() => {}}
       />
 
       <TherapyFormModal
@@ -279,6 +328,29 @@ const MainLayout = () => {
         onClose={() => setIsClinicFormOpen(false)}
         initialData={clinicInitialData}
         onClinicSaved={() => {}}
+      />
+
+      <VaccinationFormModal
+        isOpen={isVaccinationFormOpen}
+        onClose={() => setIsVaccinationFormOpen(false)}
+        defaultPet={vaccinationDefaultPet}
+        initialData={vaccinationInitialData}
+        onVaccinationSaved={() => {
+          // If modal for this pet is open, update
+          if (selectedPetId) {
+            setSelectedPetId(selectedPetId);
+          }
+        }}
+      />
+
+      <AppointmentFormModal
+        isOpen={isAppointmentFormOpen}
+        onClose={() => setIsAppointmentFormOpen(false)}
+        defaultDate={appointmentDefaultDate}
+        defaultTime={appointmentDefaultTime}
+        defaultPet={appointmentDefaultPet}
+        initialData={appointmentInitialData}
+        onAppointmentSaved={() => {}}
       />
     </div>
   );

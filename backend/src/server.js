@@ -12,6 +12,8 @@ import petRoutes from './routes/petRoutes.js';
 import visitRoutes from './routes/visitRoutes.js';
 import therapyRoutes from './routes/therapyRoutes.js';
 import statsRoutes from './routes/statsRoutes.js';
+import vaccinationRoutes from './routes/vaccinationRoutes.js';
+import appointmentRoutes from './routes/appointmentRoutes.js';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerDocument } from './config/swagger.js';
 
@@ -53,6 +55,8 @@ app.use('/api/owners', ownerRoutes);
 app.use('/api/pets', petRoutes);
 app.use('/api/visits', visitRoutes);
 app.use('/api/therapies', therapyRoutes);
+app.use('/api/vaccinations', vaccinationRoutes);
+app.use('/api/appointments', appointmentRoutes);
 app.use('/api/stats', statsRoutes);
 
 // Gestione rotte non trovate (404)

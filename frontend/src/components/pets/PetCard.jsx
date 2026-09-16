@@ -114,6 +114,20 @@ export const PetCard = ({ pet, onSelect, onNewVisit }) => {
             <span>Allergie: {pet.allergie.join(', ')}</span>
           </div>
         )}
+
+        {pet.vaccineWarning && pet.vaccineWarning.status === 'SCADUTO' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--rose-600)', backgroundColor: 'var(--rose-50)', padding: '0.3rem 0.5rem', borderRadius: 'var(--radius-sm)', fontWeight: '700', fontSize: '0.75rem' }}>
+            <AlertTriangle size={13} />
+            <span>⚠️ Richiamo scaduto: {pet.vaccineWarning.vaccino}</span>
+          </div>
+        )}
+
+        {pet.vaccineWarning && pet.vaccineWarning.status === 'IN_SCADENZA' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--amber-600)', backgroundColor: 'var(--amber-50)', padding: '0.3rem 0.5rem', borderRadius: 'var(--radius-sm)', fontWeight: '700', fontSize: '0.75rem' }}>
+            <Calendar size={13} />
+            <span>⏳ Richiamo tra {pet.vaccineWarning.daysUntil} gg: {pet.vaccineWarning.vaccino}</span>
+          </div>
+        )}
       </div>
 
       {/* Owner Info & Actions */}

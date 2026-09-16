@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   LayoutDashboard,
+  Calendar,
   Dog,
   ClipboardList,
   Pill,
@@ -18,6 +19,7 @@ export const Sidebar = ({ currentTab, onTabChange, onNewVisit, onNewPet }) => {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'agenda', label: 'Agenda & Appuntamenti', icon: Calendar },
     { id: 'pets', label: 'Pazienti (Animali)', icon: Dog },
     { id: 'visits', label: 'Visite Cliniche', icon: ClipboardList },
     { id: 'therapies', label: 'Terapie & Farmaci', icon: Pill },
