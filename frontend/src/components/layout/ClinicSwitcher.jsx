@@ -12,54 +12,44 @@ export const ClinicSwitcher = ({ onOpenNewClinic }) => {
         id="btn-add-first-clinic"
         className="btn btn-sm btn-secondary"
         onClick={onOpenNewClinic}
+        style={{
+          whiteSpace: 'nowrap',
+          fontSize: '0.78rem',
+          padding: '0.35rem 0.55rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.35rem',
+          flexShrink: 1
+        }}
       >
-        <Plus size={16} /> Aggiungi Ambulatorio
+        <Plus size={15} style={{ flexShrink: 0 }} />
+        <span>Sede</span>
       </button>
     );
   }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="clinic-switcher-wrapper">
       <button
         id="clinic-switcher-button"
-        className="btn btn-secondary"
+        className="clinic-switcher-btn"
         onClick={() => setOpen(!open)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          padding: '0.45rem 0.85rem',
-          backgroundColor: '#ffffff',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--border-color)',
-          maxWidth: '240px',
-          textAlign: 'left'
-        }}
       >
         <div
-          style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: '6px',
-            backgroundColor: activeClinic?.coloreTema || 'var(--primary)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            flexShrink: 0
-          }}
+          className="clinic-switcher-icon"
+          style={{ backgroundColor: activeClinic?.coloreTema || 'var(--primary)' }}
         >
-          <Building2 size={16} />
+          <Building2 size={15} />
         </div>
-        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-          <div style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--slate-800)', lineHeight: 1.1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div className="clinic-switcher-info">
+          <div className="clinic-switcher-name">
             {activeClinic ? activeClinic.nome : 'Tutti gli Ambulatori'}
           </div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--slate-500)' }}>
-            {activeClinic ? `${activeClinic.citta}` : `${clinics.length} sedi gestite`}
+          <div className="clinic-switcher-city">
+            {activeClinic ? `${activeClinic.citta}` : `${clinics.length} sedi`}
           </div>
         </div>
-        <ChevronDown size={14} color="var(--slate-400)" />
+        <ChevronDown size={14} color="var(--slate-400)" style={{ flexShrink: 0 }} />
       </button>
 
       {open && (
@@ -74,6 +64,7 @@ export const ClinicSwitcher = ({ onOpenNewClinic }) => {
               top: 'calc(100% + 6px)',
               right: 0,
               width: '280px',
+              maxWidth: 'min(280px, calc(100vw - 20px))',
               backgroundColor: '#ffffff',
               borderRadius: 'var(--radius-lg)',
               boxShadow: 'var(--shadow-xl)',

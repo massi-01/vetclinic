@@ -10,54 +10,38 @@ export const Navbar = ({ onOpenNewClinic }) => {
     <header className="topbar">
       <div className="brand">
         <div className="brand-icon">
-          <Stethoscope size={22} strokeWidth={2.4} />
+          <Stethoscope size={20} strokeWidth={2.4} />
         </div>
         <div className="brand-text">
-          <h1>VetClinic Pro</h1>
-          <span>Gestionale Medico</span>
+          <h1>VetClinic<span className="brand-pro"> Pro</span></h1>
+          <span className="brand-subtitle">Gestionale Medico</span>
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div className="topbar-actions">
         <ClinicSwitcher onOpenNewClinic={onOpenNewClinic} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderLeft: '1px solid var(--border-color)', paddingLeft: '0.75rem' }}>
+        <div className="topbar-user">
           <div
+            className="topbar-user-profile"
             title={`Dott. ${user?.nome} ${user?.cognome} (Albo: ${user?.codiceAlbo || 'N/D'})`}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              cursor: 'default'
-            }}
           >
             {user?.avatarUrl ? (
               <img
                 src={user.avatarUrl}
                 alt={user.nome}
-                style={{ width: '34px', height: '34px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-light)' }}
+                className="topbar-avatar"
               />
             ) : (
-              <div
-                style={{
-                  width: '34px',
-                  height: '34px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--slate-100)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--slate-600)'
-                }}
-              >
-                <UserIcon size={18} />
+              <div className="topbar-avatar-placeholder">
+                <UserIcon size={16} />
               </div>
             )}
-            <div style={{ display: 'none' }} className="d-md-block">
-              <div style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--slate-800)', lineHeight: 1.1 }}>
+            <div className="topbar-user-details">
+              <div className="topbar-user-name">
                 Dott. {user?.nome} {user?.cognome}
               </div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--slate-500)' }}>
+              <div className="topbar-user-role">
                 {user?.codiceAlbo ? `Albo ${user.codiceAlbo}` : 'Veterinario'}
               </div>
             </div>
@@ -65,10 +49,9 @@ export const Navbar = ({ onOpenNewClinic }) => {
 
           <button
             id="btn-logout"
-            className="btn btn-icon btn-secondary"
+            className="btn btn-icon btn-secondary topbar-logout-btn"
             title="Disconnetti"
             onClick={logout}
-            style={{ padding: '0.45rem', borderRadius: 'var(--radius-md)' }}
           >
             <LogOut size={16} color="var(--rose-500)" />
           </button>
