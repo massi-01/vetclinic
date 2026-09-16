@@ -57,6 +57,22 @@ L'applicazione sarà accessibile nel browser su `http://localhost:3000`.
 
 ---
 
+## 📖 Documentazione e Test Interattivo API (Swagger UI)
+
+È possibile testare tutti gli endpoint REST JSON direttamente dal browser con Swagger UI:
+- **Interfaccia Swagger UI**: [http://localhost:5000/api-docs](http://localhost:5000/api-docs)
+- **Specifiche OpenAPI JSON**: [http://localhost:5000/api-docs.json](http://localhost:5000/api-docs.json)
+
+### Come testare le API protette su Swagger:
+1. Espandi l'endpoint `POST /api/auth/login` e clicca su **"Try it out"**.
+2. Esegui la chiamata con le credenziali demo (`dr.rossi@vetclinic.it` / `Password123!`).
+3. Copia il valore del campo `token` generato nella risposta JSON.
+4. Clicca sul pulsante **"Authorize"** (in alto a destra su Swagger).
+5. Incolla il token e clicca su **Authorize**.
+6. Ora puoi testare qualsiasi endpoint (Ambulatori, Pazienti, Visite, Terapie, ecc.) leggendo e scrivendo direttamente sul database MongoDB!
+
+---
+
 ## 🔑 Credenziali Dimostrative (Precaricate)
 
 - **Email**: `dr.rossi@vetclinic.it`

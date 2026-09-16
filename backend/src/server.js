@@ -12,6 +12,8 @@ import petRoutes from './routes/petRoutes.js';
 import visitRoutes from './routes/visitRoutes.js';
 import therapyRoutes from './routes/therapyRoutes.js';
 import statsRoutes from './routes/statsRoutes.js';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerDocument } from './config/swagger.js';
 
 dotenv.config();
 
@@ -36,6 +38,12 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     service: 'VetClinic API Backend'
   });
+});
+
+// Documentazione interattiva OpenAPI / Swagger
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.get('/api-docs.json', (req, res) => {
+  res.json(swaggerDocument);
 });
 
 // Registrazione rotte API
