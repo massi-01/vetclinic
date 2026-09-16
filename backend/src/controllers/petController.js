@@ -3,8 +3,8 @@ import { dataStore } from '../services/dataStore.js';
 export const getPets = async (req, res) => {
   try {
     const { clinicId, search, specie, proprietarioId } = req.query;
-    const pets = await dataStore.getPets(clinicId, { search, specie, proprietarioId });
-    const allVaccinations = await dataStore.getVaccinations(clinicId);
+    const pets = await dataStore.getPets(clinicId, { search, specie, proprietarioId }, req.user?._id);
+    const allVaccinations = await dataStore.getVaccinations(clinicId, {}, req.user?._id);
 
     // Collega l'eventuale warning vaccinale per ciascun animale
     const petsWithVaccineAlert = pets.map((p) => {

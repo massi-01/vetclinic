@@ -510,18 +510,61 @@ export const dataStore = {
     return newUser;
   },
 
+  // Helper per ottenere gli ID degli ambulatori a cui l'utente ha accesso
+  async getUserClinicIds(vetId) {
+    if (!vetId) return [];
+    const vetIdStr = vetId.toString();
+    if (shouldUseMongo()) {
+      const user = await User.findById(vetId);
+      const userAmbs = (user?.ambulatori || []).map((id) => id.toString());
+      const clinics = await Clinic.find({
+        $or: [
+          { veterinari: vetId },
+          { _id: { $in: userAmbs } }
+        ]
+      });
+      return clinics.map((c) => c._id.toString());
+    }
+    const user = memoryData.users.find((u) => u._id.toString() === vetIdStr);
+    const userAmbs = (user?.ambulatori || []).map((a) => (a._id || a).toString());
+    return memoryData.clinics
+      .filter(
+        (c) =>
+          (c.veterinari || []).map((v) => v.toString()).includes(vetIdStr) ||
+          userAmbs.includes(c._id.toString())
+      )
+      .map((c) => c._id.toString());
+  },
+
+  // Risolve gli ID ambulatorio autorizzati per filtrare i dati
+  async resolveClinicFilter(clinicId = null, vetId = null) {
+    if (!vetId) {
+      return clinicId ? [clinicId.toString()] : null;
+    }
+    const allowed = await this.getUserClinicIds(vetId);
+    if (allowed.length === 0) {
+      // Utente senza ambulatori: isolamento completo, nessun dato visibile
+      return [];
+    }
+    if (clinicId) {
+      const clinicStr = clinicId.toString();
+      return allowed.includes(clinicStr) ? [clinicStr] : [];
+    }
+    return allowed;
+  },
+
   // === AMBULATORI / CLINICHE ===
   async getClinics(vetId = null) {
+    if (!vetId) {
+      if (shouldUseMongo()) return await Clinic.find();
+      return [...memoryData.clinics];
+    }
+    const allowedIds = await this.getUserClinicIds(vetId);
+    if (allowedIds.length === 0) return [];
     if (shouldUseMongo()) {
-      const query = vetId ? { veterinari: vetId } : {};
-      return await Clinic.find(query);
+      return await Clinic.find({ _id: { $in: allowedIds } });
     }
-    if (vetId) {
-      return memoryData.clinics.filter((c) =>
-        c.veterinari?.map((v) => v.toString()).includes(vetId.toString())
-      );
-    }
-    return [...memoryData.clinics];
+    return memoryData.clinics.filter((c) => allowedIds.includes(c._id.toString()));
   },
 
   async getClinicById(id) {
@@ -573,10 +616,13 @@ export const dataStore = {
   },
 
   // === PROPRIETARI (OWNERS) ===
-  async getOwners(clinicId = null, search = '') {
+  async getOwners(clinicId = null, search = '', vetId = null) {
+    const clinicIds = await this.resolveClinicFilter(clinicId, vetId);
+    if (clinicIds !== null && clinicIds.length === 0) return [];
+
     if (shouldUseMongo()) {
       const query = {};
-      if (clinicId) query.ambulatorioId = clinicId;
+      if (clinicIds) query.ambulatorioId = { $in: clinicIds };
       if (search) {
         const regex = new RegExp(search, 'i');
         query.$or = [{ nome: regex }, { cognome: regex }, { telefono: regex }, { codiceFiscale: regex }];
@@ -584,8 +630,8 @@ export const dataStore = {
       return await Owner.find(query).sort({ cognome: 1, nome: 1 });
     }
     let list = [...memoryData.owners];
-    if (clinicId) {
-      list = list.filter((o) => o.ambulatorioId.toString() === clinicId.toString());
+    if (clinicIds) {
+      list = list.filter((o) => clinicIds.includes(o.ambulatorioId.toString()));
     }
     if (search) {
       const term = search.toLowerCase();
@@ -641,11 +687,14 @@ export const dataStore = {
   },
 
   // === ANIMALI / PAZIENTI (PETS) ===
-  async getPets(clinicId = null, filters = {}) {
+  async getPets(clinicId = null, filters = {}, vetId = null) {
+    const clinicIds = await this.resolveClinicFilter(clinicId, vetId);
+    if (clinicIds !== null && clinicIds.length === 0) return [];
+
     const { search, specie, proprietarioId } = filters;
     if (shouldUseMongo()) {
       const query = {};
-      if (clinicId) query.ambulatorioId = clinicId;
+      if (clinicIds) query.ambulatorioId = { $in: clinicIds };
       if (proprietarioId) query.proprietarioId = proprietarioId;
       if (specie) query.specie = specie;
       if (search) {
@@ -656,8 +705,8 @@ export const dataStore = {
     }
 
     let list = [...memoryData.pets];
-    if (clinicId) {
-      list = list.filter((p) => p.ambulatorioId.toString() === clinicId.toString());
+    if (clinicIds) {
+      list = list.filter((p) => clinicIds.includes(p.ambulatorioId.toString()));
     }
     if (proprietarioId) {
       list = list.filter((p) => p.proprietarioId.toString() === proprietarioId.toString());
@@ -774,11 +823,14 @@ export const dataStore = {
   },
 
   // === VISITE (VISITS) ===
-  async getVisits(clinicId = null, filters = {}) {
+  async getVisits(clinicId = null, filters = {}, vetId = null) {
+    const clinicIds = await this.resolveClinicFilter(clinicId, vetId);
+    if (clinicIds !== null && clinicIds.length === 0) return [];
+
     const { petId, data, limit } = filters;
     if (shouldUseMongo()) {
       const query = {};
-      if (clinicId) query.ambulatorioId = clinicId;
+      if (clinicIds) query.ambulatorioId = { $in: clinicIds };
       if (petId) query.animaleId = petId;
       if (data) query.data = data;
       let q = Visit.find(query).populate('animaleId').populate('veterinarioId').populate('ambulatorioId').sort({ data: -1, createdAt: -1 });
@@ -787,8 +839,8 @@ export const dataStore = {
     }
 
     let list = [...memoryData.visits];
-    if (clinicId) {
-      list = list.filter((v) => v.ambulatorioId.toString() === clinicId.toString());
+    if (clinicIds) {
+      list = list.filter((v) => clinicIds.includes(v.ambulatorioId.toString()));
     }
     if (petId) {
       list = list.filter((v) => v.animaleId?.toString() === petId.toString());
@@ -895,19 +947,22 @@ export const dataStore = {
   },
 
   // === TERAPIE E FARMACI (THERAPIES) ===
-  async getTherapies(clinicId = null, filters = {}) {
+  async getTherapies(clinicId = null, filters = {}, vetId = null) {
+    const clinicIds = await this.resolveClinicFilter(clinicId, vetId);
+    if (clinicIds !== null && clinicIds.length === 0) return [];
+
     const { petId, attiva } = filters;
     if (shouldUseMongo()) {
       const query = {};
-      if (clinicId) query.ambulatorioId = clinicId;
+      if (clinicIds) query.ambulatorioId = { $in: clinicIds };
       if (petId) query.animaleId = petId;
       if (attiva !== undefined) query.attiva = attiva === 'true' || attiva === true;
       return await Therapy.find(query).populate('animaleId').populate('visitaId').populate('ambulatorioId').sort({ dataInizio: -1 });
     }
 
     let list = [...memoryData.therapies];
-    if (clinicId) {
-      list = list.filter((t) => t.ambulatorioId.toString() === clinicId.toString());
+    if (clinicIds) {
+      list = list.filter((t) => clinicIds.includes(t.ambulatorioId.toString()));
     }
     if (petId) {
       list = list.filter((t) => t.animaleId?.toString() === petId.toString());
@@ -983,13 +1038,16 @@ export const dataStore = {
   },
 
   // === PIANO VACCINALE (VACCINATIONS) ===
-  async getVaccinations(clinicId = null, filters = {}) {
+  async getVaccinations(clinicId = null, filters = {}, vetId = null) {
+    const clinicIds = await this.resolveClinicFilter(clinicId, vetId);
+    if (clinicIds !== null && clinicIds.length === 0) return [];
+
     const { petId, warningOnly } = filters;
     let list = [];
 
     if (shouldUseMongo()) {
       const query = {};
-      if (clinicId) query.ambulatorioId = clinicId;
+      if (clinicIds) query.ambulatorioId = { $in: clinicIds };
       if (petId) query.animaleId = petId;
       const docs = await Vaccination.find(query).populate('animaleId').populate('veterinarioId').populate('ambulatorioId').sort({ dataRichiamo: 1 });
       list = docs.map((d) => {
@@ -999,8 +1057,8 @@ export const dataStore = {
       });
     } else {
       let filtered = [...memoryData.vaccinations];
-      if (clinicId) {
-        filtered = filtered.filter((v) => v.ambulatorioId.toString() === clinicId.toString());
+      if (clinicIds) {
+        filtered = filtered.filter((v) => clinicIds.includes(v.ambulatorioId.toString()));
       }
       if (petId) {
         filtered = filtered.filter((v) => v.animaleId?.toString() === petId.toString());
@@ -1084,11 +1142,14 @@ export const dataStore = {
   },
 
   // === AGENDA E APPUNTAMENTI (APPOINTMENTS) ===
-  async getAppointments(clinicId = null, filters = {}) {
+  async getAppointments(clinicId = null, filters = {}, vetId = null) {
+    const clinicIds = await this.resolveClinicFilter(clinicId, vetId);
+    if (clinicIds !== null && clinicIds.length === 0) return [];
+
     const { data, petId, proprietarioId } = filters;
     if (shouldUseMongo()) {
       const query = {};
-      if (clinicId) query.ambulatorioId = clinicId;
+      if (clinicIds) query.ambulatorioId = { $in: clinicIds };
       if (data) query.data = data;
       if (petId) query.animaleId = petId;
       if (proprietarioId) query.proprietarioId = proprietarioId;
@@ -1101,8 +1162,8 @@ export const dataStore = {
     }
 
     let list = [...memoryData.appointments];
-    if (clinicId) {
-      list = list.filter((a) => a.ambulatorioId.toString() === clinicId.toString());
+    if (clinicIds) {
+      list = list.filter((a) => clinicIds.includes(a.ambulatorioId?.toString()));
     }
     if (data) {
       list = list.filter((a) => a.data === data);
@@ -1187,14 +1248,32 @@ export const dataStore = {
   },
 
   // === STATISTICHE DASHBOARD ===
-  async getDashboardStats(clinicId = null) {
+  async getDashboardStats(clinicId = null, vetId = null) {
+    if (vetId) {
+      const allowedIds = await this.getUserClinicIds(vetId);
+      if (allowedIds.length === 0) {
+        return {
+          totalePazienti: 0,
+          totaleProprietari: 0,
+          visiteOggi: 0,
+          terapieAttive: 0,
+          appuntamentiOggiCount: 0,
+          vacciniWarningCount: 0,
+          ultimeVisite: [],
+          terapieInScadenza: [],
+          vacciniInScadenza: [],
+          appuntamentiOggi: []
+        };
+      }
+    }
+
     const today = new Date().toISOString().split('T')[0];
-    const pets = await this.getPets(clinicId);
-    const owners = await this.getOwners(clinicId);
-    const visits = await this.getVisits(clinicId);
-    const therapies = await this.getTherapies(clinicId, { attiva: true });
-    const vaccinations = await this.getVaccinations(clinicId);
-    const appointments = await this.getAppointments(clinicId, { data: today });
+    const pets = await this.getPets(clinicId, {}, vetId);
+    const owners = await this.getOwners(clinicId, null, vetId);
+    const visits = await this.getVisits(clinicId, {}, vetId);
+    const therapies = await this.getTherapies(clinicId, { attiva: true }, vetId);
+    const vaccinations = await this.getVaccinations(clinicId, {}, vetId);
+    const appointments = await this.getAppointments(clinicId, { data: today }, vetId);
 
     const visitsToday = visits.filter((v) => {
       const vDate = typeof v.data === 'string' ? v.data.split('T')[0] : v.data?.toISOString().split('T')[0];

@@ -3,7 +3,7 @@ import { dataStore } from '../services/dataStore.js';
 export const getVisits = async (req, res) => {
   try {
     const { clinicId, petId, data, limit } = req.query;
-    const visits = await dataStore.getVisits(clinicId, { petId, data, limit });
+    const visits = await dataStore.getVisits(clinicId, { petId, data, limit }, req.user?._id);
     res.json({
       success: true,
       data: visits
@@ -28,7 +28,7 @@ export const getVisitById = async (req, res) => {
     }
 
     // Recupera anche le terapie prescritte in questa visita
-    const therapies = await dataStore.getTherapies(null, { petId: visit.animaleId?._id || visit.animaleId });
+    const therapies = await dataStore.getTherapies(null, { petId: visit.animaleId?._id || visit.animaleId }, req.user?._id);
     const visitTherapies = therapies.filter((t) => t.visitaId?.toString() === visit._id.toString());
 
     res.json({

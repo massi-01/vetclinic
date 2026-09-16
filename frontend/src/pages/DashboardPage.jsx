@@ -99,30 +99,109 @@ export const DashboardPage = ({
             <p style={{ fontSize: '0.875rem', opacity: 0.9, marginTop: '2px' }}>
               {activeClinic
                 ? `Stai gestendo: ${activeClinic.nome} (${activeClinic.citta})`
-                : `Vista globale su tutti gli ambulatori (${clinics.length} sedi collegate)`}
+                : clinics.length > 0
+                ? `Vista globale su tutti gli ambulatori (${clinics.length} sedi collegate)`
+                : 'Nessun ambulatorio attualmente collegato al tuo profilo'}
             </p>
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', alignSelf: 'center', flexWrap: 'wrap' }}>
-            <button
-              id="dashboard-btn-new-appointment"
-              className="btn"
-              style={{ backgroundColor: 'rgba(255, 255, 255, 0.18)', color: '#ffffff', fontWeight: '700', border: '1px solid rgba(255, 255, 255, 0.4)' }}
-              onClick={() => onNewAppointment ? onNewAppointment() : onNavigate('agenda')}
-            >
-              <Calendar size={16} /> Fissa Appuntamento
-            </button>
-            <button
-              id="dashboard-btn-new-visit"
-              className="btn"
-              style={{ backgroundColor: '#ffffff', color: 'var(--primary)', fontWeight: '700', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
-              onClick={() => onNewVisit()}
-            >
-              <PlusCircle size={16} /> Nuova Visita
-            </button>
+            {clinics.length > 0 ? (
+              <>
+                <button
+                  id="dashboard-btn-new-appointment"
+                  className="btn"
+                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.18)', color: '#ffffff', fontWeight: '700', border: '1px solid rgba(255, 255, 255, 0.4)' }}
+                  onClick={() => onNewAppointment ? onNewAppointment() : onNavigate('agenda')}
+                >
+                  <Calendar size={16} /> Fissa Appuntamento
+                </button>
+                <button
+                  id="dashboard-btn-new-visit"
+                  className="btn"
+                  style={{ backgroundColor: '#ffffff', color: 'var(--primary)', fontWeight: '700', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                  onClick={() => onNewVisit()}
+                >
+                  <PlusCircle size={16} /> Nuova Visita
+                </button>
+              </>
+            ) : (
+              <button
+                id="dashboard-btn-add-clinic"
+                className="btn"
+                style={{ backgroundColor: '#ffffff', color: '#0d9488', fontWeight: '800', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                onClick={() => onNavigate('clinics')}
+              >
+                <Building2 size={16} /> Collega Ambulatorio
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Warning se nessun ambulatorio è collegato */}
+      {clinics.length === 0 && (
+        <div
+          id="warning-no-clinic-banner"
+          style={{
+            backgroundColor: '#fffbeb',
+            border: '1.5px solid #f59e0b',
+            borderLeft: '6px solid #d97706',
+            borderRadius: 'var(--radius-xl)',
+            padding: '1.25rem 1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '1.25rem',
+            boxShadow: '0 4px 14px rgba(245, 158, 11, 0.12)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1, minWidth: '280px' }}>
+            <div
+              style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: 'var(--radius-lg)',
+                backgroundColor: '#fef3c7',
+                color: '#d97706',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}
+            >
+              <AlertTriangle size={26} />
+            </div>
+            <div>
+              <div style={{ fontWeight: '800', color: '#92400e', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                Non hai ancora collegato un ambulatorio
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#b45309', marginTop: '3px', lineHeight: 1.45 }}>
+                Per poter inserire pazienti, cartelle cliniche, registrare visite ed appuntamenti, configura o collega il tuo primo ambulatorio veterinario.
+              </div>
+            </div>
+          </div>
+          <button
+            id="btn-link-clinic-warning"
+            className="btn btn-primary"
+            style={{
+              backgroundColor: '#d97706',
+              borderColor: '#b45309',
+              color: '#ffffff',
+              fontWeight: '800',
+              padding: '0.65rem 1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 3px 10px rgba(217, 119, 6, 0.3)'
+            }}
+            onClick={() => onNavigate('clinics')}
+          >
+            <Building2 size={18} /> Configura Ambulatorio
+          </button>
+        </div>
+      )}
 
       {/* Urgent Vaccine Recall Alert Banner if needed */}
       {stats.vacciniInScadenza && stats.vacciniInScadenza.length > 0 && (

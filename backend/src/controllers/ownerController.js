@@ -3,7 +3,7 @@ import { dataStore } from '../services/dataStore.js';
 export const getOwners = async (req, res) => {
   try {
     const { clinicId, search } = req.query;
-    const owners = await dataStore.getOwners(clinicId, search);
+    const owners = await dataStore.getOwners(clinicId, search, req.user?._id);
     res.json({
       success: true,
       data: owners
@@ -27,7 +27,7 @@ export const getOwnerById = async (req, res) => {
       });
     }
     // Recupera anche gli animali di questo proprietario
-    const pets = await dataStore.getPets(null, { proprietarioId: owner._id });
+    const pets = await dataStore.getPets(null, { proprietarioId: owner._id }, req.user?._id);
     res.json({
       success: true,
       data: {

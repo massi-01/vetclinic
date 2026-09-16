@@ -33,6 +33,7 @@ export const ClinicProvider = ({ children }) => {
           localStorage.setItem('active_clinic_id', res.data[0]._id);
         } else {
           setActiveClinic(null);
+          localStorage.removeItem('active_clinic_id');
         }
       }
     } catch (err) {

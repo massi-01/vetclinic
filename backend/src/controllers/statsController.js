@@ -3,7 +3,7 @@ import { dataStore } from '../services/dataStore.js';
 export const getStats = async (req, res) => {
   try {
     const { clinicId } = req.query;
-    const stats = await dataStore.getDashboardStats(clinicId);
+    const stats = await dataStore.getDashboardStats(clinicId, req.user?._id);
     res.json({
       success: true,
       data: stats

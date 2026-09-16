@@ -14,7 +14,6 @@ export const LoginPage = () => {
   const [cognome, setCognome] = useState('');
   const [telefono, setTelefono] = useState('');
   const [codiceAlbo, setCodiceAlbo] = useState('');
-  const [ambulatorioNome, setAmbulatorioNome] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -47,8 +46,7 @@ export const LoginPage = () => {
         email,
         password,
         telefono,
-        codiceAlbo,
-        ambulatorioNome: ambulatorioNome || 'Il mio Ambulatorio'
+        codiceAlbo
       });
     } catch (err) {
       setError(err.message || 'Errore nella registrazione');
@@ -117,7 +115,7 @@ export const LoginPage = () => {
             VetClinic Pro
           </h1>
           <p style={{ fontSize: '0.875rem', color: 'var(--slate-500)', marginTop: '4px' }}>
-            {isRegistering ? 'Crea il tuo account veterinario e la tua clinica' : 'Accesso riservato al medico veterinario'}
+            {isRegistering ? 'Crea il tuo profilo di medico veterinario' : 'Accesso riservato al medico veterinario'}
           </p>
         </div>
 
@@ -246,17 +244,6 @@ export const LoginPage = () => {
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Nome Ambulatorio Principale</label>
-              <input
-                type="text"
-                className="form-input"
-                value={ambulatorioNome}
-                onChange={(e) => setAmbulatorioNome(e.target.value)}
-                placeholder="Clinica Veterinaria Europa"
-              />
-            </div>
-
             <button
               id="btn-submit-register"
               type="submit"
@@ -335,7 +322,7 @@ export const LoginPage = () => {
               setError('');
             }}
           >
-            {isRegistering ? 'Hai già un account? Accedi' : 'Nuovo veterinario? Registra la tua clinica'}
+            {isRegistering ? 'Hai già un account? Accedi' : 'Nuovo veterinario? Registrati'}
           </button>
         </div>
       </div>

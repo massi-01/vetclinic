@@ -3,7 +3,7 @@ import { dataStore } from '../services/dataStore.js';
 export const getVaccinations = async (req, res) => {
   try {
     const { clinicId, petId, warningOnly } = req.query;
-    const vaccinations = await dataStore.getVaccinations(clinicId, { petId, warningOnly });
+    const vaccinations = await dataStore.getVaccinations(clinicId, { petId, warningOnly }, req.user?._id);
     res.json({
       success: true,
       data: vaccinations

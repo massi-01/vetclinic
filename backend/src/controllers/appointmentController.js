@@ -3,7 +3,7 @@ import { dataStore } from '../services/dataStore.js';
 export const getAppointments = async (req, res) => {
   try {
     const { clinicId, data, petId, proprietarioId } = req.query;
-    const appointments = await dataStore.getAppointments(clinicId, { data, petId, proprietarioId });
+    const appointments = await dataStore.getAppointments(clinicId, { data, petId, proprietarioId }, req.user?._id);
     res.json({
       success: true,
       data: appointments

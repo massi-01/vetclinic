@@ -70,7 +70,7 @@ export const Sidebar = ({ currentTab, onTabChange, onNewVisit, onNewPet }) => {
           Sede Attiva
         </div>
         <div style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--slate-800)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {activeClinic ? activeClinic.nome : 'Tutte le sedi (' + clinics.length + ')'}
+          {activeClinic ? activeClinic.nome : (clinics.length > 0 ? 'Tutte le sedi (' + clinics.length + ')' : 'Nessuna sede')}
         </div>
         {activeClinic && (
           <div style={{ fontSize: '0.75rem', color: 'var(--slate-500)', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
