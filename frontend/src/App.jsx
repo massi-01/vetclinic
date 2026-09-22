@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ClinicProvider } from './context/ClinicContext';
 import { LoginPage } from './pages/LoginPage';
+import { LandingPage } from './pages/LandingPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { PetsPage } from './pages/PetsPage';
 import { VisitsPage } from './pages/VisitsPage';
@@ -27,8 +28,16 @@ import { Plus } from 'lucide-react';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 
 const MainLayout = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, login } = useAuth();
   const [currentTab, setCurrentTab] = useState('dashboard');
+  const [publicView, setPublicView] = useState('landing'); // 'landing' | 'login'
+
+  // Ogni volta che l'utente non è autenticato o effettua il logout, mostra la pagina di presentazione
+  useEffect(() => {
+    if (!user) {
+      setPublicView('landing');
+    }
+  }, [user]);
 
   // Modal States
   const [isPetFormOpen, setIsPetFormOpen] = useState(false);
@@ -82,7 +91,25 @@ const MainLayout = () => {
   }
 
   if (!user) {
-    return <LoginPage />;
+    if (publicView === 'login') {
+      return <LoginPage onBackToLanding={() => setPublicView('landing')} />;
+    }
+    return (
+      <LandingPage
+        onNavigateToLogin={() => setPublicView('login')}
+        onQuickDemo={
+          import.meta.env.DEV
+            ? async () => {
+                try {
+                  await login('dr.rossi@vetclinic.it', 'Password123!');
+                } catch (err) {
+                  setPublicView('login');
+                }
+              }
+            : null
+        }
+      />
+    );
   }
 
   // Handlers

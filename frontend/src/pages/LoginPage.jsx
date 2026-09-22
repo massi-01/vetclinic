@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Stethoscope, Lock, Mail, User, ShieldCheck, Building2, Phone, ArrowRight, Sparkles } from 'lucide-react';
+import { Stethoscope, Lock, Mail, User, ShieldCheck, Building2, Phone, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-export const LoginPage = () => {
+export const LoginPage = ({ onBackToLanding }) => {
   const { login, register } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
 
@@ -93,6 +93,35 @@ export const LoginPage = () => {
           background: '#ffffff'
         }}
       >
+        {onBackToLanding && (
+          <div style={{ marginBottom: '1.25rem' }}>
+            <button
+              id="btn-back-to-landing"
+              type="button"
+              onClick={onBackToLanding}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                background: 'none',
+                border: 'none',
+                color: 'var(--slate-500)',
+                fontSize: '0.825rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                padding: '0.2rem 0.4rem',
+                borderRadius: 'var(--radius-sm)',
+                transition: 'var(--transition-fast)'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--primary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--slate-500)'; }}
+            >
+              <ArrowLeft size={16} />
+              <span>Torna alla presentazione</span>
+            </button>
+          </div>
+        )}
+
         {/* Header Icon and Title */}
         <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
           <div
