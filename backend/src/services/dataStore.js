@@ -581,23 +581,73 @@ export const dataStore = {
 
   // === AMBULATORI / CLINICHE ===
   async getClinics(vetId = null) {
+    const mapClinicVetsMemory = (c) => {
+      const vetIds = (c.veterinari || []).map((v) => (v._id || v).toString());
+      const vets = (memoryData.users || [])
+        .filter((u) => vetIds.includes(u._id.toString()))
+        .map((u) => ({
+          _id: u._id,
+          nome: u.nome,
+          cognome: u.cognome,
+          email: u.email,
+          telefono: u.telefono,
+          codiceAlbo: u.codiceAlbo,
+          ruolo: u.ruolo
+        }));
+      const creator = (memoryData.users || []).find((u) => u._id.toString() === (c.creatoreId?._id || c.creatoreId)?.toString());
+      return {
+        ...c,
+        veterinari: vets,
+        creatoreId: creator ? { _id: creator._id, nome: creator.nome, cognome: creator.cognome, email: creator.email } : c.creatoreId
+      };
+    };
+
     if (!vetId) {
-      if (shouldUseMongo()) return await Clinic.find();
-      return [...memoryData.clinics];
+      if (shouldUseMongo()) {
+        return await Clinic.find()
+          .populate('veterinari', 'nome cognome email telefono codiceAlbo ruolo')
+          .populate('creatoreId', 'nome cognome email');
+      }
+      return memoryData.clinics.map(mapClinicVetsMemory);
     }
     const allowedIds = await this.getUserClinicIds(vetId);
     if (allowedIds.length === 0) return [];
     if (shouldUseMongo()) {
-      return await Clinic.find({ _id: { $in: allowedIds } });
+      return await Clinic.find({ _id: { $in: allowedIds } })
+        .populate('veterinari', 'nome cognome email telefono codiceAlbo ruolo')
+        .populate('creatoreId', 'nome cognome email');
     }
-    return memoryData.clinics.filter((c) => allowedIds.includes(c._id.toString()));
+    return memoryData.clinics
+      .filter((c) => allowedIds.includes(c._id.toString()))
+      .map(mapClinicVetsMemory);
   },
 
   async getClinicById(id) {
     if (shouldUseMongo()) {
-      return await Clinic.findById(id);
+      return await Clinic.findById(id)
+        .populate('veterinari', 'nome cognome email telefono codiceAlbo ruolo')
+        .populate('creatoreId', 'nome cognome email');
     }
-    return memoryData.clinics.find((c) => c._id.toString() === id.toString()) || null;
+    const clinic = memoryData.clinics.find((c) => c._id.toString() === id.toString());
+    if (!clinic) return null;
+    const vetIds = (clinic.veterinari || []).map((v) => (v._id || v).toString());
+    const vets = (memoryData.users || [])
+      .filter((u) => vetIds.includes(u._id.toString()))
+      .map((u) => ({
+        _id: u._id,
+        nome: u.nome,
+        cognome: u.cognome,
+        email: u.email,
+        telefono: u.telefono,
+        codiceAlbo: u.codiceAlbo,
+        ruolo: u.ruolo
+      }));
+    const creator = (memoryData.users || []).find((u) => u._id.toString() === (clinic.creatoreId?._id || clinic.creatoreId)?.toString());
+    return {
+      ...clinic,
+      veterinari: vets,
+      creatoreId: creator ? { _id: creator._id, nome: creator.nome, cognome: creator.cognome, email: creator.email } : clinic.creatoreId
+    };
   },
 
   async createClinic(clinicData, vetId) {

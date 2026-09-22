@@ -14,7 +14,9 @@ import {
   AlertTriangle,
   Send,
   HelpCircle,
-  Clock3
+  Clock3,
+  Stethoscope,
+  User
 } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
 import { useAuth } from '../context/AuthContext';
@@ -420,6 +422,144 @@ export const ClinicsPage = ({ onNewClinic, onEditClinic }) => {
                         {!clinic.partitaIva && !clinic.codiceFiscale && <div>Non specificati</div>}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Equipe Veterinaria & Staff Medico Operativo */}
+                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '0.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem', fontWeight: '800', color: 'var(--slate-800)' }}>
+                        <Stethoscope size={16} color="var(--primary)" />
+                        <span>Staff Medico & Veterinari Operativi</span>
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: '700',
+                            backgroundColor: 'var(--primary-50)',
+                            color: 'var(--primary)',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: 'var(--radius-full)',
+                            border: '1px solid rgba(13, 148, 136, 0.2)'
+                          }}
+                        >
+                          {Array.isArray(clinic.veterinari) ? clinic.veterinari.length : 0}
+                        </span>
+                      </div>
+                    </div>
+
+                    {Array.isArray(clinic.veterinari) && clinic.veterinari.length > 0 ? (
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                          gap: '0.75rem'
+                        }}
+                      >
+                        {clinic.veterinari.map((vet) => {
+                          const isObj = typeof vet === 'object' && vet !== null;
+                          const vetId = isObj ? vet._id : vet;
+                          const isCurrentVet = vetId === user?._id;
+                          const isClinicCreator =
+                            vetId === (clinic.creatoreId?._id || clinic.creatoreId);
+
+                          const nomeCompleto = isObj
+                            ? `Dott. ${vet.nome || ''} ${vet.cognome || ''}`.trim()
+                            : `Veterinario (ID: ${vetId})`;
+
+                          const initials = isObj && vet.nome && vet.cognome
+                            ? `${vet.nome[0]}${vet.cognome[0]}`.toUpperCase()
+                            : 'DR';
+
+                          return (
+                            <div
+                              key={vetId}
+                              id={`clinic-${clinic._id}-vet-${vetId}`}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.75rem',
+                                backgroundColor: '#ffffff',
+                                border: isCurrentVet ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                                borderRadius: 'var(--radius-md)',
+                                padding: '0.65rem 0.85rem',
+                                boxShadow: 'var(--shadow-xs)'
+                              }}
+                            >
+                              {/* Avatar Initials */}
+                              <div
+                                style={{
+                                  width: '38px',
+                                  height: '38px',
+                                  borderRadius: '50%',
+                                  background: isCurrentVet
+                                    ? 'linear-gradient(135deg, var(--primary) 0%, #0284c7 100%)'
+                                    : 'var(--slate-100)',
+                                  color: isCurrentVet ? '#ffffff' : 'var(--slate-700)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: '800',
+                                  fontSize: '0.8rem',
+                                  flexShrink: 0
+                                }}
+                              >
+                                {initials}
+                              </div>
+
+                              {/* Doctor Info */}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                  <span style={{ fontWeight: '700', fontSize: '0.85rem', color: 'var(--slate-900)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {nomeCompleto}
+                                  </span>
+                                  {isCurrentVet && (
+                                    <span
+                                      style={{
+                                        fontSize: '0.65rem',
+                                        fontWeight: '800',
+                                        backgroundColor: 'var(--primary-light)',
+                                        color: 'var(--primary)',
+                                        padding: '0.1rem 0.35rem',
+                                        borderRadius: 'var(--radius-full)'
+                                      }}
+                                    >
+                                      Tu
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Ruolo in struttura */}
+                                <div style={{ fontSize: '0.7rem', color: isClinicCreator ? 'var(--primary)' : 'var(--slate-500)', fontWeight: isClinicCreator ? '700' : '500', marginTop: '1px' }}>
+                                  {isClinicCreator ? 'Direttore Sanitario / Gestore' : 'Medico Veterinario Collaboratore'}
+                                </div>
+
+                                {/* Contatti / Albo */}
+                                {isObj && (
+                                  <div style={{ fontSize: '0.72rem', color: 'var(--slate-500)', marginTop: '2px', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                    {vet.codiceAlbo && (
+                                      <span style={{ color: 'var(--slate-600)', fontWeight: '600' }}>Albo: {vet.codiceAlbo}</span>
+                                    )}
+                                    {vet.telefono && (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                        <Phone size={10} /> {vet.telefono}
+                                      </span>
+                                    )}
+                                    {vet.email && !vet.telefono && (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                        <Mail size={10} /> {vet.email}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--slate-400)', fontStyle: 'italic', padding: '0.5rem 0' }}>
+                        Nessun veterinario attualmente registrato in questo ambulatorio.
+                      </div>
+                    )}
                   </div>
                 </div>
               );
