@@ -1591,7 +1591,7 @@ export const dataStore = {
 
     if (shouldUseMongo()) {
       const app = new Appointment(appData);
-      return await (await app.save()).populate('animaleId');
+      return await (await app.save()).populate(['animaleId', 'proprietarioId', 'ambulatorioId']);
     }
     const newApp = {
       _id: generateId(),
@@ -1629,7 +1629,7 @@ export const dataStore = {
     }
 
     if (shouldUseMongo()) {
-      return await Appointment.findByIdAndUpdate(id, updateData, { new: true }).populate('animaleId');
+      return await Appointment.findByIdAndUpdate(id, updateData, { new: true }).populate(['animaleId', 'proprietarioId', 'ambulatorioId']);
     }
     const index = memoryData.appointments.findIndex((a) => a._id.toString() === id.toString());
     if (index === -1) return null;

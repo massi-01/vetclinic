@@ -33,16 +33,22 @@ const STATUS_COLORS = {
   'Annullato': { bg: 'var(--rose-50)', color: 'var(--rose-500)', border: 'var(--rose-500)' }
 };
 
-export const AgendaPage = ({ onSelectPet, onNewAppointment, onEditAppointment }) => {
+export const AgendaPage = ({
+  onSelectPet,
+  onNewAppointment,
+  onEditAppointment,
+  refreshTrigger,
+  lastSavedAppointment
+}) => {
   const { activeClinic } = useClinic();
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  const loadAppointments = async () => {
+  const loadAppointments = async (showLoadingSpinner = true) => {
     try {
-      setLoading(true);
+      if (showLoadingSpinner) setLoading(true);
       const params = { data: selectedDate };
       if (activeClinic?._id) params.clinicId = activeClinic._id;
 
@@ -53,13 +59,32 @@ export const AgendaPage = ({ onSelectPet, onNewAppointment, onEditAppointment })
     } catch (err) {
       console.error('Errore caricamento appuntamenti agenda:', err.message);
     } finally {
-      setLoading(false);
+      if (showLoadingSpinner) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadAppointments();
+    loadAppointments(true);
   }, [selectedDate, activeClinic]);
+
+  useEffect(() => {
+    if (!refreshTrigger) return;
+    if (lastSavedAppointment) {
+      if (lastSavedAppointment.data && lastSavedAppointment.data !== selectedDate) {
+        setSelectedDate(lastSavedAppointment.data);
+        return;
+      }
+      setAppointments((prev) => {
+        const exists = prev.some((a) => a._id === lastSavedAppointment._id);
+        if (exists) {
+          return prev.map((a) => (a._id === lastSavedAppointment._id ? lastSavedAppointment : a));
+        } else {
+          return [...prev, lastSavedAppointment];
+        }
+      });
+    }
+    loadAppointments(false);
+  }, [refreshTrigger, lastSavedAppointment]);
 
   const handlePrevDay = () => {
     const d = new Date(selectedDate);
@@ -104,20 +129,44 @@ export const AgendaPage = ({ onSelectPet, onNewAppointment, onEditAppointment })
 
   // Helper to extract HH:MM string from appointment
   const getAppointmentTimeStr = (apt) => {
-    if (apt.oraInizio) return apt.oraInizio;
-    if (!apt.dataOra) return '';
-    const d = new Date(apt.dataOra);
-    if (isNaN(d)) return '';
-    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    let t = apt.oraInizio;
+    if (!t && apt.dataOra) {
+      const d = new Date(apt.dataOra);
+      if (!isNaN(d)) {
+        t = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      }
+    }
+    if (!t) return '';
+    const parts = t.split(':');
+    if (parts.length >= 2) {
+      return parts[0].padStart(2, '0') + ':' + parts[1].padStart(2, '0');
+    }
+    return t;
   };
 
-  // Group appointments by slot or nearest slot
+  const slotToMinutes = (timeStr) => {
+    if (!timeStr) return -1;
+    const [h, m] = timeStr.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+
+  // Group appointments by slot (each slot covers 30 minutes)
   const getAppointmentsForSlot = (slot) => {
+    const slotMin = slotToMinutes(slot);
+    const nextSlotMin = slotMin + 30;
+    const isFirstSlot = slot === TIME_SLOTS[0];
+    const isLastSlot = slot === TIME_SLOTS[TIME_SLOTS.length - 1];
+
     return appointments.filter((apt) => {
       if (statusFilter !== 'ALL' && apt.stato !== statusFilter) return false;
       const t = getAppointmentTimeStr(apt);
-      // exact match or within 15 min bucket
-      return t === slot;
+      if (!t) return false;
+      const aptMin = slotToMinutes(t);
+      if (aptMin === -1) return false;
+
+      if (isFirstSlot && aptMin < slotMin) return true;
+      if (isLastSlot && aptMin >= nextSlotMin) return true;
+      return aptMin >= slotMin && aptMin < nextSlotMin;
     });
   };
 

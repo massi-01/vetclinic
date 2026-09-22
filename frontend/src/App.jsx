@@ -62,6 +62,12 @@ const MainLayout = () => {
   const [appointmentInitialData, setAppointmentInitialData] = useState(null);
 
   const [petFilterOwnerId, setPetFilterOwnerId] = useState(null);
+  const [dataRefreshTrigger, setDataRefreshTrigger] = useState(0);
+  const [lastSavedAppointment, setLastSavedAppointment] = useState(null);
+
+  const triggerDataRefresh = () => {
+    setDataRefreshTrigger((prev) => prev + 1);
+  };
 
   if (loading) {
     return (
@@ -204,6 +210,7 @@ const MainLayout = () => {
               onNewAppointment={handleOpenNewAppointment}
               onNewVaccination={handleOpenNewVaccination}
               onSelectPet={handleOpenPetDetail}
+              refreshTrigger={dataRefreshTrigger}
             />
           )}
 
@@ -212,6 +219,8 @@ const MainLayout = () => {
               onSelectPet={handleOpenPetDetail}
               onNewAppointment={handleOpenNewAppointment}
               onEditAppointment={handleEditAppointment}
+              refreshTrigger={dataRefreshTrigger}
+              lastSavedAppointment={lastSavedAppointment}
             />
           )}
 
@@ -221,6 +230,7 @@ const MainLayout = () => {
               onNewVisit={handleOpenNewVisit}
               onNewPet={handleOpenNewPet}
               filterByOwnerId={petFilterOwnerId}
+              refreshTrigger={dataRefreshTrigger}
             />
           )}
 
@@ -229,6 +239,7 @@ const MainLayout = () => {
               onSelectPet={handleOpenPetDetail}
               onNewVisit={handleOpenNewVisit}
               onEditVisit={handleEditVisit}
+              refreshTrigger={dataRefreshTrigger}
             />
           )}
 
@@ -237,6 +248,7 @@ const MainLayout = () => {
               onSelectPet={handleOpenPetDetail}
               onNewTherapy={handleOpenNewTherapy}
               onEditTherapy={handleEditTherapy}
+              refreshTrigger={dataRefreshTrigger}
             />
           )}
 
@@ -246,6 +258,7 @@ const MainLayout = () => {
               onNewOwner={handleOpenNewOwner}
               onEditOwner={handleEditOwner}
               onFilterPetsByOwner={handleFilterPetsByOwner}
+              refreshTrigger={dataRefreshTrigger}
             />
           )}
 
@@ -287,6 +300,7 @@ const MainLayout = () => {
           if (selectedPetId === savedPet._id) {
             setSelectedPetId(savedPet._id);
           }
+          triggerDataRefresh();
         }}
       />
 
@@ -305,7 +319,9 @@ const MainLayout = () => {
         onClose={() => setIsVisitFormOpen(false)}
         defaultPet={visitDefaultPet}
         initialData={visitInitialData}
-        onVisitSaved={() => {}}
+        onVisitSaved={() => {
+          triggerDataRefresh();
+        }}
       />
 
       <TherapyFormModal
@@ -313,21 +329,27 @@ const MainLayout = () => {
         onClose={() => setIsTherapyFormOpen(false)}
         defaultPet={therapyDefaultPet}
         initialData={therapyInitialData}
-        onTherapySaved={() => {}}
+        onTherapySaved={() => {
+          triggerDataRefresh();
+        }}
       />
 
       <OwnerFormModal
         isOpen={isOwnerFormOpen}
         onClose={() => setIsOwnerFormOpen(false)}
         initialData={ownerInitialData}
-        onOwnerSaved={() => {}}
+        onOwnerSaved={() => {
+          triggerDataRefresh();
+        }}
       />
 
       <ClinicFormModal
         isOpen={isClinicFormOpen}
         onClose={() => setIsClinicFormOpen(false)}
         initialData={clinicInitialData}
-        onClinicSaved={() => {}}
+        onClinicSaved={() => {
+          triggerDataRefresh();
+        }}
       />
 
       <VaccinationFormModal
@@ -340,6 +362,7 @@ const MainLayout = () => {
           if (selectedPetId) {
             setSelectedPetId(selectedPetId);
           }
+          triggerDataRefresh();
         }}
       />
 
@@ -350,7 +373,10 @@ const MainLayout = () => {
         defaultTime={appointmentDefaultTime}
         defaultPet={appointmentDefaultPet}
         initialData={appointmentInitialData}
-        onAppointmentSaved={() => {}}
+        onAppointmentSaved={(savedApt) => {
+          setLastSavedAppointment(savedApt);
+          triggerDataRefresh();
+        }}
       />
     </div>
   );

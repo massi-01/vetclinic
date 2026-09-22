@@ -4,7 +4,7 @@ import { useClinic } from '../context/ClinicContext';
 import { api } from '../services/api';
 import { VisitCard } from '../components/visits/VisitCard';
 
-export const VisitsPage = ({ onSelectPet, onNewVisit, onEditVisit }) => {
+export const VisitsPage = ({ onSelectPet, onNewVisit, onEditVisit, refreshTrigger }) => {
   const { activeClinic } = useClinic();
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +30,7 @@ export const VisitsPage = ({ onSelectPet, onNewVisit, onEditVisit }) => {
 
   useEffect(() => {
     loadVisits();
-  }, [activeClinic, selectedDate]);
+  }, [activeClinic, selectedDate, refreshTrigger]);
 
   const handleDelete = async (id) => {
     if (!window.confirm('Sei sicuro di voler eliminare questo referto di visita?')) return;

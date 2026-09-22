@@ -4,7 +4,7 @@ import { useClinic } from '../context/ClinicContext';
 import { api } from '../services/api';
 import { OwnerCard } from '../components/owners/OwnerCard';
 
-export const OwnersPage = ({ onAddPetForOwner, onNewOwner, onEditOwner, onFilterPetsByOwner }) => {
+export const OwnersPage = ({ onAddPetForOwner, onNewOwner, onEditOwner, onFilterPetsByOwner, refreshTrigger }) => {
   const { activeClinic } = useClinic();
   const [owners, setOwners] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +30,7 @@ export const OwnersPage = ({ onAddPetForOwner, onNewOwner, onEditOwner, onFilter
 
   useEffect(() => {
     loadOwners();
-  }, [activeClinic]);
+  }, [activeClinic, refreshTrigger]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();

@@ -4,7 +4,7 @@ import { useClinic } from '../context/ClinicContext';
 import { api } from '../services/api';
 import { TherapyCard } from '../components/therapies/TherapyCard';
 
-export const TherapiesPage = ({ onSelectPet, onNewTherapy, onEditTherapy }) => {
+export const TherapiesPage = ({ onSelectPet, onNewTherapy, onEditTherapy, refreshTrigger }) => {
   const { activeClinic } = useClinic();
   const [therapies, setTherapies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +30,7 @@ export const TherapiesPage = ({ onSelectPet, onNewTherapy, onEditTherapy }) => {
 
   useEffect(() => {
     loadTherapies();
-  }, [activeClinic, filterActive]);
+  }, [activeClinic, filterActive, refreshTrigger]);
 
   const handleDelete = async (id) => {
     if (!window.confirm('Sei sicuro di voler eliminare questa prescrizione?')) return;

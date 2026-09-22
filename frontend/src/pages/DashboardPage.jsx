@@ -27,7 +27,8 @@ export const DashboardPage = ({
   onNewTherapy,
   onNewAppointment,
   onNewVaccination,
-  onSelectPet
+  onSelectPet,
+  refreshTrigger
 }) => {
   const { user } = useAuth();
   const { activeClinic, clinics } = useClinic();
@@ -45,9 +46,9 @@ export const DashboardPage = ({
   });
   const [loading, setLoading] = useState(true);
 
-  const loadStats = async () => {
+  const loadStats = async (showLoadingSpinner = true) => {
     try {
-      setLoading(true);
+      if (showLoadingSpinner) setLoading(true);
       const res = await api.stats.getDashboard(activeClinic?._id);
       if (res.success) {
         setStats(res.data);
@@ -55,13 +56,13 @@ export const DashboardPage = ({
     } catch (err) {
       console.error('Errore caricamento statistiche dashboard:', err.message);
     } finally {
-      setLoading(false);
+      if (showLoadingSpinner) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadStats();
-  }, [activeClinic]);
+  }, [activeClinic, refreshTrigger]);
 
   return (
     <div className="page-content" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
