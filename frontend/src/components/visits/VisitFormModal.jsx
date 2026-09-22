@@ -3,6 +3,40 @@ import { X, ClipboardList, Stethoscope, Pill, HeartPulse, Calendar } from 'lucid
 import { useClinic } from '../../context/ClinicContext';
 import { api } from '../../services/api';
 
+// Arrotonda l'orario alla mezz'ora più vicina (:00 o :30)
+const roundTimeToHalfHour = (timeStrOrDate) => {
+  let h, m;
+  if (!timeStrOrDate) {
+    const now = new Date();
+    h = now.getHours();
+    m = now.getMinutes();
+  } else if (timeStrOrDate instanceof Date) {
+    h = timeStrOrDate.getHours();
+    m = timeStrOrDate.getMinutes();
+  } else if (typeof timeStrOrDate === 'string' && timeStrOrDate.includes(':')) {
+    const parts = timeStrOrDate.split(':');
+    h = parseInt(parts[0], 10) || 0;
+    m = parseInt(parts[1], 10) || 0;
+  } else {
+    const now = new Date();
+    h = now.getHours();
+    m = now.getMinutes();
+  }
+
+  let roundedH = h;
+  let roundedM;
+  if (m < 15) {
+    roundedM = 0;
+  } else if (m < 45) {
+    roundedM = 30;
+  } else {
+    roundedM = 0;
+    roundedH = (h + 1) % 24;
+  }
+
+  return `${String(roundedH).padStart(2, '0')}:${String(roundedM).padStart(2, '0')}`;
+};
+
 export const VisitFormModal = ({
   isOpen,
   onClose,
@@ -19,7 +53,7 @@ export const VisitFormModal = ({
     animaleId: defaultPet?._id || '',
     ambulatorioId: defaultPet?.ambulatorioId?._id || defaultPet?.ambulatorioId || activeClinic?._id || (clinics[0]?._id || ''),
     data: new Date().toISOString().split('T')[0],
-    ora: new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+    ora: roundTimeToHalfHour(),
     tipoVisita: 'Controllo Generale',
     motivo: '',
     anamnesi: '',
@@ -52,7 +86,7 @@ export const VisitFormModal = ({
           animaleId: initialData.animaleId?._id || initialData.animaleId || '',
           ambulatorioId: initialData.ambulatorioId?._id || initialData.ambulatorioId || activeClinic?._id || clinics[0]?._id || '',
           data: initialData.data ? initialData.data.split('T')[0] : new Date().toISOString().split('T')[0],
-          ora: initialData.ora || '10:00',
+          ora: roundTimeToHalfHour(initialData.ora || '10:00'),
           tipoVisita: initialData.tipoVisita || 'Controllo Generale',
           motivo: initialData.motivo || '',
           anamnesi: initialData.anamnesi || '',
@@ -78,6 +112,8 @@ export const VisitFormModal = ({
           ...prev,
           animaleId: defaultPet?._id || prev.animaleId || '',
           ambulatorioId: defaultPet?.ambulatorioId?._id || defaultPet?.ambulatorioId || activeClinic?._id || clinics[0]?._id || '',
+          data: new Date().toISOString().split('T')[0],
+          ora: roundTimeToHalfHour(),
           pesoRilevato: defaultPet?.pesoAttuale || '',
           motivo: '',
           anamnesi: '',
@@ -133,7 +169,7 @@ export const VisitFormModal = ({
         animaleId: formData.animaleId,
         ambulatorioId: formData.ambulatorioId,
         data: formData.data,
-        ora: formData.ora,
+        ora: roundTimeToHalfHour(formData.ora),
         tipoVisita: formData.tipoVisita,
         motivo: formData.motivo,
         anamnesi: formData.anamnesi,
@@ -262,13 +298,15 @@ export const VisitFormModal = ({
               </div>
 
               <div className="form-group">
-                <label className="form-label">Orario</label>
+                <label className="form-label">Orario (intervallo 30m)</label>
                 <input
                   id="visit-input-ora"
                   type="time"
+                  step="1800"
                   className="form-input"
                   value={formData.ora}
                   onChange={(e) => setFormData({ ...formData, ora: e.target.value })}
+                  onBlur={(e) => setFormData((prev) => ({ ...prev, ora: roundTimeToHalfHour(e.target.value) }))}
                 />
               </div>
 

@@ -1247,8 +1247,28 @@ export const dataStore = {
       }
     };
 
+    const roundTimeToHalfHour = (timeStr) => {
+      if (!timeStr) return '09:00';
+      const parts = timeStr.split(':');
+      if (parts.length < 2) return timeStr;
+      const h = parseInt(parts[0], 10) || 0;
+      const m = parseInt(parts[1], 10) || 0;
+      let roundedH = h;
+      let roundedM;
+      if (m < 15) {
+        roundedM = 0;
+      } else if (m < 45) {
+        roundedM = 30;
+      } else {
+        roundedM = 0;
+        roundedH = (h + 1) % 24;
+      }
+      return `${String(roundedH).padStart(2, '0')}:${String(roundedM).padStart(2, '0')}`;
+    };
+
     const dateStr = formatDateStr(visitData.data);
-    const startTime = visitData.ora || '10:00';
+    const startTime = roundTimeToHalfHour(visitData.ora);
+    visitData.ora = startTime;
     const endTime = calculateEndTime(startTime, 30);
     const mappedStatus = mapVisitStateToAppointmentState(visitData.stato);
     const mappedType = mapVisitTypeToAppointmentType(visitData.tipoVisita);
@@ -1408,6 +1428,29 @@ export const dataStore = {
         default: return undefined;
       }
     };
+
+    const roundTimeToHalfHour = (timeStr) => {
+      if (!timeStr) return undefined;
+      const parts = timeStr.split(':');
+      if (parts.length < 2) return timeStr;
+      const h = parseInt(parts[0], 10) || 0;
+      const m = parseInt(parts[1], 10) || 0;
+      let roundedH = h;
+      let roundedM;
+      if (m < 15) {
+        roundedM = 0;
+      } else if (m < 45) {
+        roundedM = 30;
+      } else {
+        roundedM = 0;
+        roundedH = (h + 1) % 24;
+      }
+      return `${String(roundedH).padStart(2, '0')}:${String(roundedM).padStart(2, '0')}`;
+    };
+
+    if (updateData.ora) {
+      updateData.ora = roundTimeToHalfHour(updateData.ora);
+    }
 
     if (shouldUseMongo()) {
       const updated = await Visit.findByIdAndUpdate(id, updateData, { new: true })
