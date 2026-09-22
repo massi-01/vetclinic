@@ -573,6 +573,12 @@ export const dataStore = {
     return allowed;
   },
 
+  async isUserAuthorizedForClinic(vetId, clinicId) {
+    if (!vetId || !clinicId) return false;
+    const allowed = await this.getUserClinicIds(vetId);
+    return allowed.includes(clinicId.toString());
+  },
+
   // === AMBULATORI / CLINICHE ===
   async getClinics(vetId = null) {
     if (!vetId) {
@@ -984,7 +990,15 @@ export const dataStore = {
 
   async deleteOwner(id) {
     if (shouldUseMongo()) {
+      const petCount = await Pet.countDocuments({ proprietarioId: id });
+      if (petCount > 0) {
+        throw new Error(`Impossibile eliminare il proprietario: sono presenti ${petCount} animale/i associati. Rimuovere o trasferire prima i pazienti.`);
+      }
       return await Owner.findByIdAndDelete(id);
+    }
+    const petCount = memoryData.pets.filter((p) => (p.proprietarioId?._id || p.proprietarioId)?.toString() === id.toString()).length;
+    if (petCount > 0) {
+      throw new Error(`Impossibile eliminare il proprietario: sono presenti ${petCount} animale/i associati. Rimuovere o trasferire prima i pazienti.`);
     }
     const index = memoryData.owners.findIndex((o) => o._id.toString() === id.toString());
     if (index === -1) return null;
@@ -1119,11 +1133,20 @@ export const dataStore = {
   },
 
   async deletePet(id) {
+    const idStr = id.toString();
     if (shouldUseMongo()) {
+      await Visit.deleteMany({ animaleId: id });
+      await Therapy.deleteMany({ animaleId: id });
+      await Vaccination.deleteMany({ animaleId: id });
+      await Appointment.deleteMany({ animaleId: id });
       return await Pet.findByIdAndDelete(id);
     }
-    const index = memoryData.pets.findIndex((p) => p._id.toString() === id.toString());
+    const index = memoryData.pets.findIndex((p) => p._id.toString() === idStr);
     if (index === -1) return null;
+    memoryData.visits = memoryData.visits.filter((v) => (v.animaleId?._id || v.animaleId)?.toString() !== idStr);
+    memoryData.therapies = memoryData.therapies.filter((t) => (t.animaleId?._id || t.animaleId)?.toString() !== idStr);
+    memoryData.vaccinations = memoryData.vaccinations.filter((vac) => (vac.animaleId?._id || vac.animaleId)?.toString() !== idStr);
+    memoryData.appointments = memoryData.appointments.filter((a) => (a.animaleId?._id || a.animaleId)?.toString() !== idStr);
     return memoryData.pets.splice(index, 1)[0];
   },
 
@@ -1286,6 +1309,17 @@ export const dataStore = {
         ambulatorioId: clinic || t.ambulatorioId
       };
     });
+  },
+
+  async getTherapyById(id) {
+    if (shouldUseMongo()) {
+      return await Therapy.findById(id).populate('animaleId').populate('ambulatorioId');
+    }
+    const t = memoryData.therapies.find((th) => th._id.toString() === id.toString());
+    if (!t) return null;
+    const pet = memoryData.pets.find((p) => p._id.toString() === t.animaleId?.toString());
+    const clinic = memoryData.clinics.find((c) => c._id.toString() === t.ambulatorioId?.toString());
+    return { ...t, animaleId: pet || t.animaleId, ambulatorioId: clinic || t.ambulatorioId };
   },
 
   async createTherapy(therapyData) {
@@ -1514,7 +1548,47 @@ export const dataStore = {
     };
   },
 
+  async checkAppointmentConflict(ambulatorioId, data, oraInizio, oraFine, excludeId = null) {
+    const safeFine = oraFine || oraInizio;
+    if (shouldUseMongo()) {
+      const query = {
+        ambulatorioId,
+        data,
+        stato: { $ne: 'Annullato' },
+        $or: [
+          { oraInizio: { $lt: safeFine }, oraFine: { $gt: oraInizio } },
+          { oraInizio: oraInizio }
+        ]
+      };
+      if (excludeId) {
+        query._id = { $ne: excludeId };
+      }
+      return await Appointment.findOne(query);
+    }
+    const excludeIdStr = excludeId ? excludeId.toString() : null;
+    return memoryData.appointments.find((a) => {
+      if (excludeIdStr && a._id.toString() === excludeIdStr) return false;
+      if ((a.ambulatorioId?._id || a.ambulatorioId)?.toString() !== ambulatorioId.toString()) return false;
+      if (a.data !== data) return false;
+      if (a.stato === 'Annullato') return false;
+      const existingFine = a.oraFine || a.oraInizio;
+      return (oraInizio < existingFine && safeFine > a.oraInizio) || a.oraInizio === oraInizio;
+    });
+  },
+
   async createAppointment(appData) {
+    if (appData.stato !== 'Annullato') {
+      const conflict = await this.checkAppointmentConflict(
+        appData.ambulatorioId,
+        appData.data,
+        appData.oraInizio,
+        appData.oraFine
+      );
+      if (conflict) {
+        throw new Error('CONFLITTO_ORARIO: Esiste già un appuntamento attivo in questo ambulatorio per lo slot orario selezionato.');
+      }
+    }
+
     if (shouldUseMongo()) {
       const app = new Appointment(appData);
       return await (await app.save()).populate('animaleId');
@@ -1532,6 +1606,28 @@ export const dataStore = {
   },
 
   async updateAppointment(id, updateData) {
+    const existing = await this.getAppointmentById(id);
+    if (!existing) return null;
+
+    const mergedAmb = updateData.ambulatorioId || (existing.ambulatorioId?._id || existing.ambulatorioId);
+    const mergedData = updateData.data || existing.data;
+    const mergedInizio = updateData.oraInizio || existing.oraInizio;
+    const mergedFine = updateData.oraFine || existing.oraFine;
+    const mergedStato = updateData.stato || existing.stato;
+
+    if (mergedStato !== 'Annullato') {
+      const conflict = await this.checkAppointmentConflict(
+        mergedAmb,
+        mergedData,
+        mergedInizio,
+        mergedFine,
+        id
+      );
+      if (conflict) {
+        throw new Error('CONFLITTO_ORARIO: Esiste già un appuntamento attivo in questo ambulatorio per lo slot orario selezionato.');
+      }
+    }
+
     if (shouldUseMongo()) {
       return await Appointment.findByIdAndUpdate(id, updateData, { new: true }).populate('animaleId');
     }

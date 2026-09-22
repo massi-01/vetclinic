@@ -70,5 +70,8 @@ const therapySchema = new mongoose.Schema(
   }
 );
 
+therapySchema.index({ ambulatorioId: 1, dataFine: 1 });
+therapySchema.index({ animaleId: 1, attiva: 1 });
+
 const Therapy = mongoose.models.Therapy || mongoose.model('Therapy', therapySchema);
 export default Therapy;

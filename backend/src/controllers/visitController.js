@@ -27,6 +27,15 @@ export const getVisitById = async (req, res) => {
       });
     }
 
+    const clinicId = visit.ambulatorioId?._id || visit.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, clinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato ad accedere a questa cartella di visita'
+      });
+    }
+
     // Recupera anche le terapie prescritte in questa visita
     const therapies = await dataStore.getTherapies(null, { petId: visit.animaleId?._id || visit.animaleId }, req.user?._id);
     const visitTherapies = therapies.filter((t) => t.visitaId?.toString() === visit._id.toString());
@@ -69,6 +78,14 @@ export const createVisit = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Motivo, animale e ambulatorio sono obbligatori'
+      });
+    }
+
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, ambulatorioId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non hai i permessi per registrare visite in questo ambulatorio'
       });
     }
 
@@ -126,13 +143,24 @@ export const createVisit = async (req, res) => {
 
 export const updateVisit = async (req, res) => {
   try {
-    const visit = await dataStore.updateVisit(req.params.id, req.body);
-    if (!visit) {
+    const existing = await dataStore.getVisitById(req.params.id);
+    if (!existing) {
       return res.status(404).json({
         success: false,
         message: 'Visita non trovata'
       });
     }
+
+    const currentClinicId = existing.ambulatorioId?._id || existing.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, currentClinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato a modificare questa visita'
+      });
+    }
+
+    const visit = await dataStore.updateVisit(req.params.id, req.body);
     res.json({
       success: true,
       data: visit
@@ -148,13 +176,24 @@ export const updateVisit = async (req, res) => {
 
 export const deleteVisit = async (req, res) => {
   try {
-    const visit = await dataStore.deleteVisit(req.params.id);
-    if (!visit) {
+    const existing = await dataStore.getVisitById(req.params.id);
+    if (!existing) {
       return res.status(404).json({
         success: false,
         message: 'Visita non trovata'
       });
     }
+
+    const currentClinicId = existing.ambulatorioId?._id || existing.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, currentClinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato ad eliminare questa visita'
+      });
+    }
+
+    await dataStore.deleteVisit(req.params.id);
     res.json({
       success: true,
       message: 'Visita eliminata con successo'

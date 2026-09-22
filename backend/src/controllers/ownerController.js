@@ -26,6 +26,16 @@ export const getOwnerById = async (req, res) => {
         message: 'Proprietario non trovato'
       });
     }
+
+    const clinicId = owner.ambulatorioId?._id || owner.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, clinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato ad accedere all\'anagrafica di questo cliente'
+      });
+    }
+
     // Recupera anche gli animali di questo proprietario
     const pets = await dataStore.getPets(null, { proprietarioId: owner._id }, req.user?._id);
     res.json({
@@ -52,6 +62,14 @@ export const createOwner = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Nome, cognome, telefono e ambulatorio sono obbligatori'
+      });
+    }
+
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, ambulatorioId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non hai i permessi per creare anagrafiche in questo ambulatorio'
       });
     }
 
@@ -82,13 +100,24 @@ export const createOwner = async (req, res) => {
 
 export const updateOwner = async (req, res) => {
   try {
-    const owner = await dataStore.updateOwner(req.params.id, req.body);
-    if (!owner) {
+    const existing = await dataStore.getOwnerById(req.params.id);
+    if (!existing) {
       return res.status(404).json({
         success: false,
         message: 'Proprietario non trovato'
       });
     }
+
+    const currentClinicId = existing.ambulatorioId?._id || existing.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, currentClinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato a modificare questo cliente'
+      });
+    }
+
+    const owner = await dataStore.updateOwner(req.params.id, req.body);
     res.json({
       success: true,
       data: owner
@@ -104,22 +133,33 @@ export const updateOwner = async (req, res) => {
 
 export const deleteOwner = async (req, res) => {
   try {
-    const owner = await dataStore.deleteOwner(req.params.id);
-    if (!owner) {
+    const existing = await dataStore.getOwnerById(req.params.id);
+    if (!existing) {
       return res.status(404).json({
         success: false,
         message: 'Proprietario non trovato'
       });
     }
+
+    const currentClinicId = existing.ambulatorioId?._id || existing.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, currentClinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato ad eliminare questo cliente'
+      });
+    }
+
+    await dataStore.deleteOwner(req.params.id);
     res.json({
       success: true,
       message: 'Proprietario eliminato con successo'
     });
   } catch (error) {
-    res.status(500).json({
+    const isConstraintError = error.message && error.message.includes('Impossibile eliminare');
+    res.status(isConstraintError ? 400 : 500).json({
       success: false,
-      message: "Errore durante l'eliminazione del proprietario",
-      error: error.message
+      message: error.message || "Errore durante l'eliminazione del proprietario"
     });
   }
 };

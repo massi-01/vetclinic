@@ -26,6 +26,16 @@ export const getAppointmentById = async (req, res) => {
         message: 'Appuntamento non trovato'
       });
     }
+
+    const clinicId = app.ambulatorioId?._id || app.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, clinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato ad accedere a questo appuntamento'
+      });
+    }
+
     res.json({
       success: true,
       data: app
@@ -62,6 +72,14 @@ export const createAppointment = async (req, res) => {
       });
     }
 
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, ambulatorioId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non hai i permessi per fissare appuntamenti in questo ambulatorio'
+      });
+    }
+
     // Calcolo automatico oraFine se non specificata
     let calculatedFine = oraFine;
     const duration = Number(durataMinuti) || 30;
@@ -93,6 +111,12 @@ export const createAppointment = async (req, res) => {
       data: app
     });
   } catch (error) {
+    if (error.message && error.message.includes('CONFLITTO_ORARIO')) {
+      return res.status(409).json({
+        success: false,
+        message: error.message.replace('CONFLITTO_ORARIO: ', '')
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Errore durante la creazione dell\'appuntamento',
@@ -103,18 +127,35 @@ export const createAppointment = async (req, res) => {
 
 export const updateAppointment = async (req, res) => {
   try {
-    const app = await dataStore.updateAppointment(req.params.id, req.body);
-    if (!app) {
+    const existing = await dataStore.getAppointmentById(req.params.id);
+    if (!existing) {
       return res.status(404).json({
         success: false,
         message: 'Appuntamento non trovato'
       });
     }
+
+    const currentClinicId = existing.ambulatorioId?._id || existing.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, currentClinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato a modificare questo appuntamento'
+      });
+    }
+
+    const app = await dataStore.updateAppointment(req.params.id, req.body);
     res.json({
       success: true,
       data: app
     });
   } catch (error) {
+    if (error.message && error.message.includes('CONFLITTO_ORARIO')) {
+      return res.status(409).json({
+        success: false,
+        message: error.message.replace('CONFLITTO_ORARIO: ', '')
+      });
+    }
     res.status(500).json({
       success: false,
       message: "Errore durante l'aggiornamento dell'appuntamento",
@@ -125,13 +166,24 @@ export const updateAppointment = async (req, res) => {
 
 export const deleteAppointment = async (req, res) => {
   try {
-    const app = await dataStore.deleteAppointment(req.params.id);
-    if (!app) {
+    const existing = await dataStore.getAppointmentById(req.params.id);
+    if (!existing) {
       return res.status(404).json({
         success: false,
         message: 'Appuntamento non trovato'
       });
     }
+
+    const currentClinicId = existing.ambulatorioId?._id || existing.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, currentClinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato ad eliminare questo appuntamento'
+      });
+    }
+
+    await dataStore.deleteAppointment(req.params.id);
     res.json({
       success: true,
       message: 'Appuntamento eliminato con successo'

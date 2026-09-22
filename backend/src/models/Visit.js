@@ -69,5 +69,9 @@ const visitSchema = new mongoose.Schema(
   }
 );
 
+visitSchema.index({ ambulatorioId: 1, data: -1 });
+visitSchema.index({ animaleId: 1, data: -1 });
+visitSchema.index({ veterinarioId: 1 });
+
 const Visit = mongoose.models.Visit || mongoose.model('Visit', visitSchema);
 export default Visit;

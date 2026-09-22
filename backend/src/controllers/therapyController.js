@@ -40,6 +40,14 @@ export const createTherapy = async (req, res) => {
       });
     }
 
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, ambulatorioId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non hai i permessi per prescrivere terapie in questo ambulatorio'
+      });
+    }
+
     const startDate = dataInizio ? new Date(dataInizio) : new Date();
     const days = Number(durataGiorni) || 7;
     const endDate = new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000);
@@ -76,13 +84,24 @@ export const createTherapy = async (req, res) => {
 
 export const updateTherapy = async (req, res) => {
   try {
-    const therapy = await dataStore.updateTherapy(req.params.id, req.body);
-    if (!therapy) {
+    const existing = await dataStore.getTherapyById(req.params.id);
+    if (!existing) {
       return res.status(404).json({
         success: false,
         message: 'Terapia non trovata'
       });
     }
+
+    const currentClinicId = existing.ambulatorioId?._id || existing.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, currentClinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato a modificare questa terapia'
+      });
+    }
+
+    const therapy = await dataStore.updateTherapy(req.params.id, req.body);
     res.json({
       success: true,
       data: therapy
@@ -98,13 +117,24 @@ export const updateTherapy = async (req, res) => {
 
 export const deleteTherapy = async (req, res) => {
   try {
-    const therapy = await dataStore.deleteTherapy(req.params.id);
-    if (!therapy) {
+    const existing = await dataStore.getTherapyById(req.params.id);
+    if (!existing) {
       return res.status(404).json({
         success: false,
         message: 'Terapia non trovata'
       });
     }
+
+    const currentClinicId = existing.ambulatorioId?._id || existing.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, currentClinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato ad eliminare questa terapia'
+      });
+    }
+
+    await dataStore.deleteTherapy(req.params.id);
     res.json({
       success: true,
       message: 'Terapia eliminata con successo'

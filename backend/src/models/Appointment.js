@@ -61,5 +61,10 @@ const appointmentSchema = new mongoose.Schema(
   }
 );
 
+appointmentSchema.index({ ambulatorioId: 1, data: 1, oraInizio: 1 });
+appointmentSchema.index({ veterinarioId: 1, data: 1 });
+appointmentSchema.index({ animaleId: 1 });
+appointmentSchema.index({ data: 1 });
+
 const Appointment = mongoose.models.Appointment || mongoose.model('Appointment', appointmentSchema);
 export default Appointment;

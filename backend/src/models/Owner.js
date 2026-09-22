@@ -50,5 +50,9 @@ const ownerSchema = new mongoose.Schema(
   }
 );
 
+ownerSchema.index({ ambulatorioId: 1, cognome: 1, nome: 1 });
+ownerSchema.index({ codiceFiscale: 1 });
+ownerSchema.index({ telefono: 1 });
+
 const Owner = mongoose.models.Owner || mongoose.model('Owner', ownerSchema);
 export default Owner;

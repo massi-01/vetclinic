@@ -51,5 +51,8 @@ const vaccinationSchema = new mongoose.Schema(
   }
 );
 
+vaccinationSchema.index({ ambulatorioId: 1, dataRichiamo: 1 });
+vaccinationSchema.index({ animaleId: 1 });
+
 const Vaccination = mongoose.models.Vaccination || mongoose.model('Vaccination', vaccinationSchema);
 export default Vaccination;

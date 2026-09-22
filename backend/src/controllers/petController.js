@@ -57,6 +57,15 @@ export const getPetById = async (req, res) => {
       });
     }
 
+    const clinicId = pet.ambulatorioId?._id || pet.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, clinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato ad accedere alla cartella di questo paziente'
+      });
+    }
+
     // Carica visite, terapie e vaccinazioni del paziente
     const visits = await dataStore.getVisits(null, { petId: pet._id });
     const therapies = await dataStore.getTherapies(null, { petId: pet._id });
@@ -108,6 +117,14 @@ export const createPet = async (req, res) => {
       });
     }
 
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, ambulatorioId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non hai i permessi per registrare pazienti in questo ambulatorio'
+      });
+    }
+
     const pet = await dataStore.createPet({
       nome,
       specie,
@@ -140,13 +157,34 @@ export const createPet = async (req, res) => {
 
 export const updatePet = async (req, res) => {
   try {
-    const pet = await dataStore.updatePet(req.params.id, req.body);
-    if (!pet) {
+    const existing = await dataStore.getPetById(req.params.id);
+    if (!existing) {
       return res.status(404).json({
         success: false,
         message: 'Animale non trovato'
       });
     }
+
+    const currentClinicId = existing.ambulatorioId?._id || existing.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, currentClinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato a modificare questo paziente'
+      });
+    }
+
+    if (req.body.ambulatorioId && req.body.ambulatorioId.toString() !== currentClinicId.toString()) {
+      const hasTargetAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, req.body.ambulatorioId);
+      if (!hasTargetAccess) {
+        return res.status(403).json({
+          success: false,
+          message: "Non hai i permessi per trasferire l'animale all'ambulatorio specificato"
+        });
+      }
+    }
+
+    const pet = await dataStore.updatePet(req.params.id, req.body);
     res.json({
       success: true,
       data: pet
@@ -162,13 +200,24 @@ export const updatePet = async (req, res) => {
 
 export const deletePet = async (req, res) => {
   try {
-    const pet = await dataStore.deletePet(req.params.id);
-    if (!pet) {
+    const existing = await dataStore.getPetById(req.params.id);
+    if (!existing) {
       return res.status(404).json({
         success: false,
         message: 'Animale non trovato'
       });
     }
+
+    const currentClinicId = existing.ambulatorioId?._id || existing.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, currentClinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato ad eliminare questo paziente'
+      });
+    }
+
+    await dataStore.deletePet(req.params.id);
     res.json({
       success: true,
       message: 'Cartella clinica rimossa con successo'

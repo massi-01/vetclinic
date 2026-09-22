@@ -25,6 +25,15 @@ export const getClinicById = async (req, res) => {
         message: 'Ambulatorio non trovato'
       });
     }
+
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, clinic._id);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato a visualizzare questo ambulatorio'
+      });
+    }
+
     res.json({
       success: true,
       data: clinic
@@ -81,16 +90,41 @@ export const createClinic = async (req, res) => {
 
 export const updateClinic = async (req, res) => {
   try {
-    const clinic = await dataStore.updateClinic(req.params.id, req.body);
+    const clinic = await dataStore.getClinicById(req.params.id);
     if (!clinic) {
       return res.status(404).json({
         success: false,
         message: 'Ambulatorio non trovato'
       });
     }
+
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, clinic._id);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato a modificare questo ambulatorio'
+      });
+    }
+
+    const { nome, indirizzo, citta, cap, telefono, email, partitaIva, codiceFiscale, orariApertura, prontoSoccorso24h, coloreTema } = req.body;
+    const safeUpdate = {
+      ...(nome !== undefined && { nome }),
+      ...(indirizzo !== undefined && { indirizzo }),
+      ...(citta !== undefined && { citta }),
+      ...(cap !== undefined && { cap }),
+      ...(telefono !== undefined && { telefono }),
+      ...(email !== undefined && { email }),
+      ...(partitaIva !== undefined && { partitaIva }),
+      ...(codiceFiscale !== undefined && { codiceFiscale }),
+      ...(orariApertura !== undefined && { orariApertura }),
+      ...(prontoSoccorso24h !== undefined && { prontoSoccorso24h: !!prontoSoccorso24h }),
+      ...(coloreTema !== undefined && { coloreTema })
+    };
+
+    const updated = await dataStore.updateClinic(req.params.id, safeUpdate);
     res.json({
       success: true,
-      data: clinic
+      data: updated
     });
   } catch (error) {
     res.status(500).json({

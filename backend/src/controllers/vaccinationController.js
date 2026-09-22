@@ -26,6 +26,16 @@ export const getVaccinationById = async (req, res) => {
         message: 'Vaccinazione non trovata'
       });
     }
+
+    const clinicId = vac.ambulatorioId?._id || vac.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, clinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato ad accedere a questa vaccinazione'
+      });
+    }
+
     res.json({
       success: true,
       data: vac
@@ -59,6 +69,14 @@ export const createVaccination = async (req, res) => {
       });
     }
 
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, ambulatorioId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non hai i permessi per registrare vaccinazioni in questo ambulatorio'
+      });
+    }
+
     const vac = await dataStore.createVaccination({
       nomeVaccino,
       categoria: categoria || 'Richiamo Annuale',
@@ -86,13 +104,24 @@ export const createVaccination = async (req, res) => {
 
 export const updateVaccination = async (req, res) => {
   try {
-    const vac = await dataStore.updateVaccination(req.params.id, req.body);
-    if (!vac) {
+    const existing = await dataStore.getVaccinationById(req.params.id);
+    if (!existing) {
       return res.status(404).json({
         success: false,
         message: 'Vaccinazione non trovata'
       });
     }
+
+    const currentClinicId = existing.ambulatorioId?._id || existing.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, currentClinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato a modificare questa vaccinazione'
+      });
+    }
+
+    const vac = await dataStore.updateVaccination(req.params.id, req.body);
     res.json({
       success: true,
       data: vac
@@ -108,13 +137,24 @@ export const updateVaccination = async (req, res) => {
 
 export const deleteVaccination = async (req, res) => {
   try {
-    const vac = await dataStore.deleteVaccination(req.params.id);
-    if (!vac) {
+    const existing = await dataStore.getVaccinationById(req.params.id);
+    if (!existing) {
       return res.status(404).json({
         success: false,
         message: 'Vaccinazione non trovata'
       });
     }
+
+    const currentClinicId = existing.ambulatorioId?._id || existing.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, currentClinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato ad eliminare questa vaccinazione'
+      });
+    }
+
+    await dataStore.deleteVaccination(req.params.id);
     res.json({
       success: true,
       message: 'Vaccinazione rimossa con successo'

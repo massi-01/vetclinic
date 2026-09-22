@@ -89,5 +89,10 @@ const petSchema = new mongoose.Schema(
   }
 );
 
+petSchema.index({ ambulatorioId: 1, createdAt: -1 });
+petSchema.index({ proprietarioId: 1 });
+petSchema.index({ microchip: 1 });
+petSchema.index({ nome: 1 });
+
 const Pet = mongoose.models.Pet || mongoose.model('Pet', petSchema);
 export default Pet;
