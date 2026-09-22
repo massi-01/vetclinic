@@ -18,6 +18,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useClinic } from '../context/ClinicContext';
 import { api } from '../services/api';
+import { SkeletonStatCard } from '../components/common/SkeletonLoaders';
 
 export const DashboardPage = ({
   onNavigate,
@@ -245,92 +246,100 @@ export const DashboardPage = ({
       )}
 
       {/* KPI Stats Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
-        <div
-          className="stat-card card-hoverable"
-          style={{ cursor: 'pointer' }}
-          onClick={() => onNavigate('pets')}
-        >
-          <div className="stat-icon" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)' }}>
-            <Dog size={24} />
-          </div>
-          <div>
-            <div className="stat-value">{stats.totalePazienti}</div>
-            <div className="stat-label">Pazienti Registrati</div>
-          </div>
+      {loading ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonStatCard key={i} />
+          ))}
         </div>
-
-        <div
-          className="stat-card card-hoverable"
-          style={{ cursor: 'pointer' }}
-          onClick={() => onNavigate('agenda')}
-        >
-          <div className="stat-icon" style={{ backgroundColor: '#e0e7ff', color: '#4338ca' }}>
-            <Calendar size={24} />
-          </div>
-          <div>
-            <div className="stat-value">{stats.appuntamentiOggiCount || stats.appuntamentiOggi?.length || 0}</div>
-            <div className="stat-label">Appuntamenti Oggi</div>
-          </div>
-        </div>
-
-        <div
-          className="stat-card card-hoverable"
-          style={{ cursor: 'pointer' }}
-          onClick={() => onNavigate('owners')}
-        >
-          <div className="stat-icon" style={{ backgroundColor: 'var(--blue-50)', color: 'var(--blue-500)' }}>
-            <Users size={24} />
-          </div>
-          <div>
-            <div className="stat-value">{stats.totaleProprietari}</div>
-            <div className="stat-label">Proprietari / Clienti</div>
-          </div>
-        </div>
-
-        <div
-          className="stat-card card-hoverable"
-          style={{ cursor: 'pointer' }}
-          onClick={() => onNavigate('visits')}
-        >
-          <div className="stat-icon" style={{ backgroundColor: 'var(--purple-50)', color: 'var(--purple-500)' }}>
-            <Stethoscope size={24} />
-          </div>
-          <div>
-            <div className="stat-value">{stats.visiteOggi}</div>
-            <div className="stat-label">Visite Eseguite Oggi</div>
-          </div>
-        </div>
-
-        <div
-          className="stat-card card-hoverable"
-          style={{ cursor: 'pointer' }}
-          onClick={() => onNavigate('therapies')}
-        >
-          <div className="stat-icon" style={{ backgroundColor: 'var(--emerald-50)', color: 'var(--emerald-500)' }}>
-            <Pill size={24} />
-          </div>
-          <div>
-            <div className="stat-value">{stats.terapieAttive}</div>
-            <div className="stat-label">Terapie Attive</div>
-          </div>
-        </div>
-
-        <div
-          className="stat-card card-hoverable"
-          style={{ cursor: 'pointer' }}
-        >
-          <div className="stat-icon" style={{ backgroundColor: stats.vacciniWarningCount > 0 ? 'var(--rose-50)' : 'var(--emerald-50)', color: stats.vacciniWarningCount > 0 ? 'var(--rose-500)' : 'var(--emerald-500)' }}>
-            <Syringe size={24} />
-          </div>
-          <div>
-            <div className="stat-value" style={{ color: stats.vacciniWarningCount > 0 ? 'var(--rose-600)' : 'var(--emerald-600)' }}>
-              {stats.vacciniWarningCount}
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+          <div
+            className="stat-card card-hoverable"
+            style={{ cursor: 'pointer' }}
+            onClick={() => onNavigate('pets')}
+          >
+            <div className="stat-icon" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)' }}>
+              <Dog size={24} />
             </div>
-            <div className="stat-label">Avvisi Vaccinali</div>
+            <div>
+              <div className="stat-value">{stats.totalePazienti}</div>
+              <div className="stat-label">Pazienti Registrati</div>
+            </div>
+          </div>
+
+          <div
+            className="stat-card card-hoverable"
+            style={{ cursor: 'pointer' }}
+            onClick={() => onNavigate('agenda')}
+          >
+            <div className="stat-icon" style={{ backgroundColor: '#e0e7ff', color: '#4338ca' }}>
+              <Calendar size={24} />
+            </div>
+            <div>
+              <div className="stat-value">{stats.appuntamentiOggiCount || stats.appuntamentiOggi?.length || 0}</div>
+              <div className="stat-label">Appuntamenti Oggi</div>
+            </div>
+          </div>
+
+          <div
+            className="stat-card card-hoverable"
+            style={{ cursor: 'pointer' }}
+            onClick={() => onNavigate('owners')}
+          >
+            <div className="stat-icon" style={{ backgroundColor: 'var(--blue-50)', color: 'var(--blue-500)' }}>
+              <Users size={24} />
+            </div>
+            <div>
+              <div className="stat-value">{stats.totaleProprietari}</div>
+              <div className="stat-label">Proprietari / Clienti</div>
+            </div>
+          </div>
+
+          <div
+            className="stat-card card-hoverable"
+            style={{ cursor: 'pointer' }}
+            onClick={() => onNavigate('visits')}
+          >
+            <div className="stat-icon" style={{ backgroundColor: 'var(--purple-50)', color: 'var(--purple-500)' }}>
+              <Stethoscope size={24} />
+            </div>
+            <div>
+              <div className="stat-value">{stats.visiteOggi}</div>
+              <div className="stat-label">Visite Eseguite Oggi</div>
+            </div>
+          </div>
+
+          <div
+            className="stat-card card-hoverable"
+            style={{ cursor: 'pointer' }}
+            onClick={() => onNavigate('therapies')}
+          >
+            <div className="stat-icon" style={{ backgroundColor: 'var(--emerald-50)', color: 'var(--emerald-500)' }}>
+              <Pill size={24} />
+            </div>
+            <div>
+              <div className="stat-value">{stats.terapieAttive}</div>
+              <div className="stat-label">Terapie Attive</div>
+            </div>
+          </div>
+
+          <div
+            className="stat-card card-hoverable"
+            style={{ cursor: 'pointer' }}
+          >
+            <div className="stat-icon" style={{ backgroundColor: stats.vacciniWarningCount > 0 ? 'var(--rose-50)' : 'var(--emerald-50)', color: stats.vacciniWarningCount > 0 ? 'var(--rose-500)' : 'var(--emerald-500)' }}>
+              <Syringe size={24} />
+            </div>
+            <div>
+              <div className="stat-value" style={{ color: stats.vacciniWarningCount > 0 ? 'var(--rose-600)' : 'var(--emerald-600)' }}>
+                {stats.vacciniWarningCount}
+              </div>
+              <div className="stat-label">Avvisi Vaccinali</div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Quick Action Shortcuts */}
       <div
@@ -386,7 +395,13 @@ export const DashboardPage = ({
             </button>
           </div>
 
-          {(!stats.appuntamentiOggi || stats.appuntamentiOggi.length === 0) ? (
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div className="skeleton" style={{ height: '54px', borderRadius: 'var(--radius-md)' }} />
+              <div className="skeleton" style={{ height: '54px', borderRadius: 'var(--radius-md)' }} />
+              <div className="skeleton" style={{ height: '54px', borderRadius: 'var(--radius-md)' }} />
+            </div>
+          ) : (!stats.appuntamentiOggi || stats.appuntamentiOggi.length === 0) ? (
             <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--slate-400)', fontSize: '0.85rem' }}>
               Nessun appuntamento fissato per la giornata odierna
             </div>
@@ -443,7 +458,12 @@ export const DashboardPage = ({
             </div>
           </div>
 
-          {(!stats.vacciniInScadenza || stats.vacciniInScadenza.length === 0) ? (
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div className="skeleton" style={{ height: '54px', borderRadius: 'var(--radius-md)' }} />
+              <div className="skeleton" style={{ height: '54px', borderRadius: 'var(--radius-md)' }} />
+            </div>
+          ) : (!stats.vacciniInScadenza || stats.vacciniInScadenza.length === 0) ? (
             <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--slate-400)', fontSize: '0.85rem' }}>
               Tutti i richiami vaccinali sono regolari
             </div>
@@ -520,7 +540,12 @@ export const DashboardPage = ({
             </button>
           </div>
 
-          {stats.terapieInScadenza.length === 0 ? (
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div className="skeleton" style={{ height: '54px', borderRadius: 'var(--radius-md)' }} />
+              <div className="skeleton" style={{ height: '54px', borderRadius: 'var(--radius-md)' }} />
+            </div>
+          ) : stats.terapieInScadenza.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--slate-400)', fontSize: '0.85rem' }}>
               Nessuna terapia attiva registrata
             </div>

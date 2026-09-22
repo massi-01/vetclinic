@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
 import { api } from '../services/api';
+import { SkeletonAgendaSlots } from '../components/common/SkeletonLoaders';
 
 const TIME_SLOTS = [
   '08:30', '09:00', '09:30', '10:00', '10:30', '11:00',
@@ -469,9 +470,7 @@ export const AgendaPage = ({
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--slate-400)' }}>
-            Caricamento agenda per {formattedDateTitle}...
-          </div>
+          <SkeletonAgendaSlots count={8} />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {TIME_SLOTS.map((slot) => {

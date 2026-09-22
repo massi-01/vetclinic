@@ -3,6 +3,7 @@ import { Plus, Search, Users } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
 import { api } from '../services/api';
 import { OwnerCard } from '../components/owners/OwnerCard';
+import { SkeletonGrid } from '../components/common/SkeletonLoaders';
 
 export const OwnersPage = ({ onAddPetForOwner, onNewOwner, onEditOwner, onFilterPetsByOwner, refreshTrigger }) => {
   const { activeClinic } = useClinic();
@@ -88,9 +89,7 @@ export const OwnersPage = ({ onAddPetForOwner, onNewOwner, onEditOwner, onFilter
 
       {/* Owners Grid */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--slate-400)' }}>
-          Caricamento elenco clienti...
-        </div>
+        <SkeletonGrid count={6} minWidth="300px" hasAvatar={false} lines={3} />
       ) : owners.length === 0 ? (
         <div
           className="card"

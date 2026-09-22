@@ -3,6 +3,7 @@ import { Plus, Pill, Filter } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
 import { api } from '../services/api';
 import { TherapyCard } from '../components/therapies/TherapyCard';
+import { SkeletonGrid } from '../components/common/SkeletonLoaders';
 
 export const TherapiesPage = ({ onSelectPet, onNewTherapy, onEditTherapy, refreshTrigger }) => {
   const { activeClinic } = useClinic();
@@ -93,9 +94,7 @@ export const TherapiesPage = ({ onSelectPet, onNewTherapy, onEditTherapy, refres
 
       {/* Therapies Grid */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--slate-400)' }}>
-          Caricamento terapie in corso...
-        </div>
+        <SkeletonGrid count={6} minWidth="280px" hasAvatar={false} lines={3} />
       ) : therapies.length === 0 ? (
         <div
           className="card"

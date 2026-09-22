@@ -24,6 +24,7 @@ import { VaccinationFormModal } from './components/vaccinations/VaccinationFormM
 import { AppointmentFormModal } from './components/appointments/AppointmentFormModal';
 
 import { Plus } from 'lucide-react';
+import { LoadingSpinner } from './components/common/LoadingSpinner';
 
 const MainLayout = () => {
   const { user, loading } = useAuth();
@@ -71,10 +72,11 @@ const MainLayout = () => {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-app)' }}>
-        <div style={{ textAlign: 'center', color: 'var(--slate-500)', fontSize: '1rem', fontWeight: '600' }}>
-          Caricamento gestionale VetClinic...
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--bg-app)', gap: '1rem' }}>
+        <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'linear-gradient(135deg, var(--primary) 0%, #0284c7 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 20px rgba(13, 148, 136, 0.25)', fontSize: '1.8rem' }}>
+          🩺
         </div>
+        <LoadingSpinner size="md" message="Inizializzazione gestionale VetClinic..." />
       </div>
     );
   }

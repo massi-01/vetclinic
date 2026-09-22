@@ -3,6 +3,7 @@ import { Plus, Calendar, Filter, ClipboardList } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
 import { api } from '../services/api';
 import { VisitCard } from '../components/visits/VisitCard';
+import { SkeletonGrid } from '../components/common/SkeletonLoaders';
 
 export const VisitsPage = ({ onSelectPet, onNewVisit, onEditVisit, refreshTrigger }) => {
   const { activeClinic } = useClinic();
@@ -91,9 +92,7 @@ export const VisitsPage = ({ onSelectPet, onNewVisit, onEditVisit, refreshTrigge
 
       {/* Visits List */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--slate-400)' }}>
-          Caricamento visite in corso...
-        </div>
+        <SkeletonGrid count={4} minWidth="320px" hasAvatar={false} lines={4} />
       ) : visits.length === 0 ? (
         <div
           className="card"

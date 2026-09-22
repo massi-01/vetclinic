@@ -3,6 +3,7 @@ import { Search, Plus, Dog, Filter, AlertCircle } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
 import { api } from '../services/api';
 import { PetCard } from '../components/pets/PetCard';
+import { SkeletonGrid } from '../components/common/SkeletonLoaders';
 
 export const PetsPage = ({ onSelectPet, onNewVisit, onNewPet, filterByOwnerId = null, refreshTrigger }) => {
   const { activeClinic } = useClinic();
@@ -108,9 +109,7 @@ export const PetsPage = ({ onSelectPet, onNewVisit, onNewPet, filterByOwnerId = 
 
       {/* Patients Grid */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--slate-400)' }}>
-          Ricerca pazienti in corso...
-        </div>
+        <SkeletonGrid count={6} minWidth="280px" />
       ) : pets.length === 0 ? (
         <div
           className="card"

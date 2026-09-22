@@ -159,7 +159,11 @@ export const ClinicsPage = ({ onNewClinic, onEditClinic }) => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            {pendingReceived.map((req) => {
+            {loadingRequests ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <div className="skeleton" style={{ height: '72px', borderRadius: 'var(--radius-lg)' }} />
+              </div>
+            ) : pendingReceived.map((req) => {
               const vet = req.veterinarioId;
               const clinic = req.ambulatorioId;
               const isWorking = actionInProgress === req._id;
