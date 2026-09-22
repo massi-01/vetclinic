@@ -152,6 +152,44 @@ async function runTests() {
   assert.strictEqual(cancelledApp.stato, 'Annullato', 'Lo stato deve essere aggiornato ad Annullato');
   console.log('   ✅ Cambio di stato appuntamento gestito correttamente senza conflitti.\n');
 
+  // Test 7: Sincronizzazione automatica Visite Cliniche ➔ Calendario Appuntamenti
+  console.log('7. Verifica sincronizzazione Visita Clinica -> Calendario Appuntamenti...');
+  const visitSyncDate = '2026-11-25';
+  const newVisitSync = await dataStore.createVisit({
+    data: visitSyncDate,
+    ora: '11:00',
+    tipoVisita: 'Controllo Generale',
+    motivo: 'Visita dermatologica per prurito',
+    stato: 'Completata',
+    animaleId: samplePet._id,
+    ambulatorioId: clinic1._id
+  });
+
+  assert(newVisitSync._id, 'Visita creata con successo');
+  assert(newVisitSync.appuntamento, 'La visita deve generare un appuntamento collegato');
+  assert.strictEqual(newVisitSync.appuntamento.stato, 'Completato', 'Lo stato della visita Completata deve essere mappato a Completato');
+  assert.strictEqual(newVisitSync.appuntamento.oraInizio, '11:00', 'L\'orario dell\'appuntamento deve corrispondere a quello della visita');
+
+  // Verifica che getAppointments per quel giorno trovi l'appuntamento
+  const appsForDate = await dataStore.getAppointments(clinic1._id, { data: visitSyncDate });
+  const matchedApp = appsForDate.find(a => (a.visitaId?._id || a.visitaId)?.toString() === newVisitSync._id.toString());
+  assert(matchedApp, 'L\'appuntamento generato dalla visita deve comparire in getAppointments');
+  assert.strictEqual(matchedApp.motivo, 'Visita dermatologica per prurito');
+
+  // Modifica visita
+  await dataStore.updateVisit(newVisitSync._id, { motivo: 'Visita dermatologica aggiornata', stato: 'In corso' });
+  const updatedAppsForDate = await dataStore.getAppointments(clinic1._id, { data: visitSyncDate });
+  const updatedMatchedApp = updatedAppsForDate.find(a => (a.visitaId?._id || a.visitaId)?.toString() === newVisitSync._id.toString());
+  assert.strictEqual(updatedMatchedApp.motivo, 'Visita dermatologica aggiornata');
+  assert.strictEqual(updatedMatchedApp.stato, 'In Visita');
+
+  // Cancellazione visita -> appuntamento rimosso dal calendario
+  await dataStore.deleteVisit(newVisitSync._id);
+  const appsAfterDelete = await dataStore.getAppointments(clinic1._id, { data: visitSyncDate });
+  const deletedMatchedApp = appsAfterDelete.find(a => (a.visitaId?._id || a.visitaId)?.toString() === newVisitSync._id.toString());
+  assert.strictEqual(deletedMatchedApp, undefined, 'L\'appuntamento deve essere rimosso dal calendario quando la visita viene eliminata');
+  console.log('   ✅ Sincronizzazione automatica Visita -> Calendario perfettamente funzionante (creazione, visualizzazione, modifica, eliminazione).\n');
+
   console.log('🎉 TUTTI I TEST P1 SONO STATI SUPERATI CON SUCCESSO!');
 }
 

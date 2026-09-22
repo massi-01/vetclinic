@@ -1210,9 +1210,56 @@ export const dataStore = {
   },
 
   async createVisit(visitData) {
+    const formatDateStr = (d) => {
+      if (!d) return new Date().toISOString().split('T')[0];
+      if (typeof d === 'string') return d.split('T')[0];
+      if (d instanceof Date) return d.toISOString().split('T')[0];
+      return String(d).split('T')[0];
+    };
+
+    const calculateEndTime = (startStr, duration = 30) => {
+      const safeStart = startStr || '10:00';
+      const [h, m] = safeStart.split(':').map(Number);
+      const total = (h || 0) * 60 + (m || 0) + duration;
+      const endH = Math.floor(total / 60) % 24;
+      const endM = total % 60;
+      return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+    };
+
+    const mapVisitStateToAppointmentState = (state) => {
+      switch (state) {
+        case 'Completata': return 'Completato';
+        case 'In corso': return 'In Visita';
+        case 'Prenotata': return 'Prenotato';
+        case 'Annullata': return 'Annullato';
+        default: return 'Completato';
+      }
+    };
+
+    const mapVisitTypeToAppointmentType = (tipo) => {
+      switch (tipo) {
+        case 'Vaccinazione': return 'Vaccinazione';
+        case 'Chirurgia': return 'Chirurgia';
+        case 'Pronto Soccorso': return 'Visita Generale';
+        case 'Visita Specialistica': return 'Visita Generale';
+        case 'Controllo Generale': return 'Visita Generale';
+        default: return 'Visita Generale';
+      }
+    };
+
+    const dateStr = formatDateStr(visitData.data);
+    const startTime = visitData.ora || '10:00';
+    const endTime = calculateEndTime(startTime, 30);
+    const mappedStatus = mapVisitStateToAppointmentState(visitData.stato);
+    const mappedType = mapVisitTypeToAppointmentType(visitData.tipoVisita);
+
     if (shouldUseMongo()) {
       const visit = new Visit(visitData);
       const saved = await visit.save();
+
+      // Recupera animale per proprietarioId
+      const pet = await Pet.findById(visitData.animaleId);
+
       // Se è stato registrato un peso, aggiorna lo storico dell'animale
       if (visitData.parametriVitali?.pesoRilevato) {
         await Pet.findByIdAndUpdate(visitData.animaleId, {
@@ -1226,9 +1273,65 @@ export const dataStore = {
           }
         });
       }
-      return await saved.populate('animaleId');
+
+      // Sincronizzazione automatica con l'agenda (Appointment)
+      let linkedApp = null;
+      if (visitData.appuntamentoId) {
+        linkedApp = await Appointment.findByIdAndUpdate(
+          visitData.appuntamentoId,
+          {
+            visitaId: saved._id,
+            stato: mappedStatus,
+            motivo: visitData.motivo
+          },
+          { new: true }
+        );
+      } else {
+        // Cerca se esiste già un appuntamento per questo paziente allo stesso orario e data
+        const existingApp = await Appointment.findOne({
+          animaleId: visitData.animaleId,
+          ambulatorioId: visitData.ambulatorioId,
+          data: dateStr,
+          oraInizio: startTime
+        });
+
+        if (existingApp) {
+          existingApp.visitaId = saved._id;
+          existingApp.stato = mappedStatus;
+          existingApp.motivo = visitData.motivo || existingApp.motivo;
+          linkedApp = await existingApp.save();
+        } else {
+          // Crea nuovo appuntamento nell'agenda
+          const newApp = new Appointment({
+            data: dateStr,
+            oraInizio: startTime,
+            oraFine: endTime,
+            durataMinuti: 30,
+            tipoPrestazione: mappedType,
+            motivo: visitData.motivo,
+            stato: mappedStatus,
+            note: visitData.note || '',
+            animaleId: visitData.animaleId,
+            proprietarioId: pet?.proprietarioId,
+            veterinarioId: visitData.veterinarioId,
+            ambulatorioId: visitData.ambulatorioId,
+            visitaId: saved._id
+          });
+          linkedApp = await newApp.save();
+        }
+
+        if (linkedApp) {
+          await Visit.findByIdAndUpdate(saved._id, { appuntamentoId: linkedApp._id });
+          saved.appuntamentoId = linkedApp._id;
+        }
+      }
+
+      const populatedVisit = await saved.populate(['animaleId', 'veterinarioId', 'ambulatorioId']);
+      const visitObj = populatedVisit.toObject ? populatedVisit.toObject() : populatedVisit;
+      return { ...visitObj, appuntamento: linkedApp };
     }
 
+    // Modalità In-Memory Fallback
     const newVisit = {
       _id: generateId(),
       ...visitData,
@@ -1237,41 +1340,147 @@ export const dataStore = {
     memoryData.visits.push(newVisit);
 
     // Se è stato rilevato un peso, aggiorna lo storico peso dell'animale
-    if (visitData.parametriVitali?.pesoRilevato) {
-      const pet = memoryData.pets.find((p) => p._id.toString() === visitData.animaleId.toString());
-      if (pet) {
-        pet.pesoAttuale = Number(visitData.parametriVitali.pesoRilevato);
-        pet.storicoPeso = pet.storicoPeso || [];
-        pet.storicoPeso.push({
-          data: visitData.data || new Date().toISOString().split('T')[0],
-          peso: Number(visitData.parametriVitali.pesoRilevato),
-          note: `Rilevato in visita: ${visitData.tipoVisita}`
-        });
-      }
+    const pet = memoryData.pets.find((p) => p._id.toString() === visitData.animaleId.toString());
+    if (visitData.parametriVitali?.pesoRilevato && pet) {
+      pet.pesoAttuale = Number(visitData.parametriVitali.pesoRilevato);
+      pet.storicoPeso = pet.storicoPeso || [];
+      pet.storicoPeso.push({
+        data: dateStr,
+        peso: Number(visitData.parametriVitali.pesoRilevato),
+        note: `Rilevato in visita: ${visitData.tipoVisita}`
+      });
     }
 
-    const pet = memoryData.pets.find((p) => p._id.toString() === newVisit.animaleId?.toString());
-    return { ...newVisit, animaleId: pet || newVisit.animaleId };
+    // Sincronizzazione automatica appuntamento in-memory
+    let linkedApp = null;
+    const existingIndex = memoryData.appointments.findIndex(
+      (a) =>
+        (a.animaleId?._id || a.animaleId)?.toString() === visitData.animaleId.toString() &&
+        a.data === dateStr &&
+        a.oraInizio === startTime
+    );
+
+    if (existingIndex !== -1) {
+      memoryData.appointments[existingIndex].visitaId = newVisit._id;
+      memoryData.appointments[existingIndex].stato = mappedStatus;
+      memoryData.appointments[existingIndex].motivo = visitData.motivo;
+      linkedApp = memoryData.appointments[existingIndex];
+      newVisit.appuntamentoId = linkedApp._id;
+    } else {
+      linkedApp = {
+        _id: generateId(),
+        data: dateStr,
+        oraInizio: startTime,
+        oraFine: endTime,
+        durataMinuti: 30,
+        tipoPrestazione: mappedType,
+        motivo: visitData.motivo,
+        stato: mappedStatus,
+        note: visitData.note || '',
+        animaleId: pet || visitData.animaleId,
+        proprietarioId: pet?.proprietarioId,
+        veterinarioId: visitData.veterinarioId,
+        ambulatorioId: visitData.ambulatorioId,
+        visitaId: newVisit._id,
+        createdAt: new Date().toISOString()
+      };
+      memoryData.appointments.push(linkedApp);
+      newVisit.appuntamentoId = linkedApp._id;
+    }
+
+    return { ...newVisit, animaleId: pet || newVisit.animaleId, appuntamento: linkedApp };
   },
 
   async updateVisit(id, updateData) {
+    const formatDateStr = (d) => {
+      if (!d) return null;
+      if (typeof d === 'string') return d.split('T')[0];
+      if (d instanceof Date) return d.toISOString().split('T')[0];
+      return String(d).split('T')[0];
+    };
+
+    const mapVisitStateToAppointmentState = (state) => {
+      switch (state) {
+        case 'Completata': return 'Completato';
+        case 'In corso': return 'In Visita';
+        case 'Prenotata': return 'Prenotato';
+        case 'Annullata': return 'Annullato';
+        default: return undefined;
+      }
+    };
+
     if (shouldUseMongo()) {
-      return await Visit.findByIdAndUpdate(id, updateData, { new: true }).populate('animaleId');
+      const updated = await Visit.findByIdAndUpdate(id, updateData, { new: true })
+        .populate(['animaleId', 'veterinarioId', 'ambulatorioId']);
+      if (!updated) return null;
+
+      // Sincronizza l'appuntamento collegato
+      const appQuery = updated.appuntamentoId ? { _id: updated.appuntamentoId } : { visitaId: id };
+      const appUpdate = {};
+      if (updateData.data) appUpdate.data = formatDateStr(updateData.data);
+      if (updateData.ora) appUpdate.oraInizio = updateData.ora;
+      if (updateData.motivo) appUpdate.motivo = updateData.motivo;
+      if (updateData.stato) appUpdate.stato = mapVisitStateToAppointmentState(updateData.stato);
+
+      if (Object.keys(appUpdate).length > 0) {
+        await Appointment.findOneAndUpdate(appQuery, appUpdate);
+      }
+
+      return updated;
     }
+
     const index = memoryData.visits.findIndex((v) => v._id.toString() === id.toString());
     if (index === -1) return null;
     memoryData.visits[index] = { ...memoryData.visits[index], ...updateData };
+
+    // Sincronizza in memory
+    const appIndex = memoryData.appointments.findIndex(
+      (a) =>
+        (memoryData.visits[index].appuntamentoId && a._id.toString() === memoryData.visits[index].appuntamentoId.toString()) ||
+        a.visitaId?.toString() === id.toString()
+    );
+    if (appIndex !== -1) {
+      if (updateData.data) memoryData.appointments[appIndex].data = formatDateStr(updateData.data);
+      if (updateData.ora) memoryData.appointments[appIndex].oraInizio = updateData.ora;
+      if (updateData.motivo) memoryData.appointments[appIndex].motivo = updateData.motivo;
+      if (updateData.stato) {
+        const mapped = mapVisitStateToAppointmentState(updateData.stato);
+        if (mapped) memoryData.appointments[appIndex].stato = mapped;
+      }
+    }
+
     const pet = memoryData.pets.find((p) => p._id.toString() === memoryData.visits[index].animaleId?.toString());
     return { ...memoryData.visits[index], animaleId: pet || memoryData.visits[index].animaleId };
   },
 
   async deleteVisit(id) {
     if (shouldUseMongo()) {
+      const visit = await Visit.findById(id);
+      if (visit) {
+        // Rimuovi l'appuntamento associato se generato da questa visita
+        if (visit.appuntamentoId) {
+          await Appointment.findByIdAndDelete(visit.appuntamentoId);
+        } else {
+          await Appointment.deleteMany({ visitaId: id });
+        }
+      }
       return await Visit.findByIdAndDelete(id);
     }
+
     const index = memoryData.visits.findIndex((v) => v._id.toString() === id.toString());
     if (index === -1) return null;
-    return memoryData.visits.splice(index, 1)[0];
+    const removedVisit = memoryData.visits.splice(index, 1)[0];
+
+    // Rimuovi appuntamento collegato
+    memoryData.appointments = memoryData.appointments.filter(
+      (a) =>
+        !(
+          (removedVisit.appuntamentoId && a._id.toString() === removedVisit.appuntamentoId.toString()) ||
+          a.visitaId?.toString() === id.toString()
+        )
+    );
+
+    return removedVisit;
   },
 
   // === TERAPIE E FARMACI (THERAPIES) ===

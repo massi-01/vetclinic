@@ -349,7 +349,10 @@ const MainLayout = () => {
         onClose={() => setIsVisitFormOpen(false)}
         defaultPet={visitDefaultPet}
         initialData={visitInitialData}
-        onVisitSaved={() => {
+        onVisitSaved={(savedVisit) => {
+          if (savedVisit?.appuntamento) {
+            setLastSavedAppointment(savedVisit.appuntamento);
+          }
           triggerDataRefresh();
         }}
       />

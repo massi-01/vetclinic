@@ -13,7 +13,8 @@ import {
   Edit3,
   Search,
   Filter,
-  Check
+  Check,
+  Stethoscope
 } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
 import { api } from '../services/api';
@@ -565,7 +566,7 @@ export const AgendaPage = ({
                             </div>
 
                             {/* Procedure & Duration */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                               <span
                                 style={{
                                   fontSize: '0.8rem',
@@ -579,6 +580,26 @@ export const AgendaPage = ({
                               >
                                 {apt.motivo}
                               </span>
+                              {apt.visitaId && (
+                                <span
+                                  style={{
+                                    fontSize: '0.7rem',
+                                    fontWeight: '700',
+                                    padding: '0.15rem 0.5rem',
+                                    borderRadius: 'var(--radius-full)',
+                                    backgroundColor: 'var(--primary-50)',
+                                    color: 'var(--primary)',
+                                    border: '1px solid rgba(13, 148, 136, 0.25)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem'
+                                  }}
+                                  title="Registrata da Cartella Clinica"
+                                >
+                                  <Stethoscope size={11} strokeWidth={2.5} />
+                                  <span>Visita Clinica</span>
+                                </span>
+                              )}
                               <span style={{ fontSize: '0.75rem', color: 'var(--slate-500)' }}>
                                 {apt.durataMinuti || 30} min
                               </span>

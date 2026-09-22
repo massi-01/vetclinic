@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ClipboardList, Stethoscope, Pill, HeartPulse } from 'lucide-react';
+import { X, ClipboardList, Stethoscope, Pill, HeartPulse, Calendar } from 'lucide-react';
 import { useClinic } from '../../context/ClinicContext';
 import { api } from '../../services/api';
 
@@ -285,6 +285,25 @@ export const VisitFormModal = ({
                   <option value="Prenotata">Prenotata</option>
                 </select>
               </div>
+            </div>
+
+            {/* Avviso sincronizzazione automatica calendario */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                fontSize: '0.78rem',
+                color: 'var(--primary)',
+                backgroundColor: 'var(--primary-50)',
+                padding: '0.45rem 0.8rem',
+                borderRadius: 'var(--radius-sm)',
+                marginBottom: '1rem',
+                border: '1px solid rgba(13, 148, 136, 0.2)'
+              }}
+            >
+              <Calendar size={14} />
+              <span>Questa visita clinica sarà registrata e visibile automaticamente sull'agenda giornaliera.</span>
             </div>
 
             {/* Motivo Visita */}

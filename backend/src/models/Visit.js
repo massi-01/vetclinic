@@ -62,6 +62,10 @@ const visitSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Clinic',
       required: true
+    },
+    appuntamentoId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Appointment'
     }
   },
   {
@@ -72,6 +76,7 @@ const visitSchema = new mongoose.Schema(
 visitSchema.index({ ambulatorioId: 1, data: -1 });
 visitSchema.index({ animaleId: 1, data: -1 });
 visitSchema.index({ veterinarioId: 1 });
+visitSchema.index({ appuntamentoId: 1 });
 
 const Visit = mongoose.models.Visit || mongoose.model('Visit', visitSchema);
 export default Visit;
