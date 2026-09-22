@@ -12,7 +12,8 @@ import {
   Trash2,
   Edit3,
   Search,
-  Filter
+  Filter,
+  Check
 } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
 import { api } from '../services/api';
@@ -180,6 +181,8 @@ export const AgendaPage = ({
   };
 
   // Summary counts
+  const countPrenotati = appointments.filter((a) => a.stato === 'Prenotato').length;
+  const countConfermati = appointments.filter((a) => a.stato === 'Confermato').length;
   const countInAttesa = appointments.filter((a) => a.stato === 'In Attesa').length;
   const countInVisita = appointments.filter((a) => a.stato === 'In Visita').length;
   const countCompletati = appointments.filter((a) => a.stato === 'Completato').length;
@@ -202,6 +205,7 @@ export const AgendaPage = ({
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--slate-500)' }}>
             Agenda Oraria {activeClinic ? `per ${activeClinic.nome}` : ''} • {appointments.length} appuntamenti
+            {countConfermati > 0 ? ` (${countConfermati} confermati)` : ''}
           </p>
         </div>
 
@@ -295,44 +299,160 @@ export const AgendaPage = ({
       </div>
 
       {/* Quick Summary Bar */}
-      <div className="grid-responsive" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
-        <div className="card" style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div className="grid-responsive" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+        {/* Totale */}
+        <div
+          id="counter-card-totale"
+          className="card card-hoverable"
+          onClick={() => setStatusFilter('ALL')}
+          style={{
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            cursor: 'pointer',
+            border: statusFilter === 'ALL' ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+            backgroundColor: statusFilter === 'ALL' ? 'var(--primary-light)' : '#ffffff',
+            transition: 'var(--transition-fast)'
+          }}
+          title="Mostra tutti gli appuntamenti"
+        >
           <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <CalendarIcon size={18} />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--slate-500)', fontWeight: '600' }}>Totale Oggi</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--slate-900)' }}>{appointments.length}</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--slate-500)', fontWeight: '600' }}>Totale Giorno</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--slate-900)' }}>{appointments.length}</div>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {/* Prenotati */}
+        <div
+          id="counter-card-prenotati"
+          className="card card-hoverable"
+          onClick={() => setStatusFilter(statusFilter === 'Prenotato' ? 'ALL' : 'Prenotato')}
+          style={{
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            cursor: 'pointer',
+            border: statusFilter === 'Prenotato' ? '2px solid #0284c7' : '1px solid var(--border-color)',
+            backgroundColor: statusFilter === 'Prenotato' ? '#f0f9ff' : '#ffffff',
+            transition: 'var(--transition-fast)'
+          }}
+          title="Filtra per stato Prenotato"
+        >
+          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Clock size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--slate-500)', fontWeight: '600' }}>Prenotati</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0284c7' }}>{countPrenotati}</div>
+          </div>
+        </div>
+
+        {/* Confermati */}
+        <div
+          id="counter-card-confermati"
+          className="card card-hoverable"
+          onClick={() => setStatusFilter(statusFilter === 'Confermato' ? 'ALL' : 'Confermato')}
+          style={{
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            cursor: 'pointer',
+            border: statusFilter === 'Confermato' ? '2px solid #6366f1' : '1px solid var(--border-color)',
+            backgroundColor: statusFilter === 'Confermato' ? '#eef2ff' : '#ffffff',
+            transition: 'var(--transition-fast)'
+          }}
+          title="Filtra per stato Confermato"
+        >
+          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#e0e7ff', color: '#4338ca', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Check size={18} strokeWidth={2.5} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--slate-500)', fontWeight: '600' }}>Confermati</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#4338ca' }}>{countConfermati}</div>
+          </div>
+        </div>
+
+        {/* In Sala d'Attesa */}
+        <div
+          id="counter-card-in-attesa"
+          className="card card-hoverable"
+          onClick={() => setStatusFilter(statusFilter === 'In Attesa' ? 'ALL' : 'In Attesa')}
+          style={{
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            cursor: 'pointer',
+            border: statusFilter === 'In Attesa' ? '2px solid var(--amber-500)' : '1px solid var(--border-color)',
+            backgroundColor: statusFilter === 'In Attesa' ? 'var(--amber-50)' : '#ffffff',
+            transition: 'var(--transition-fast)'
+          }}
+          title="Filtra pazienti in sala d'attesa"
+        >
           <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--amber-50)', color: 'var(--amber-500)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Clock size={18} />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--slate-500)', fontWeight: '600' }}>In Sala d'Attesa</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--amber-500)' }}>{countInAttesa}</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--slate-500)', fontWeight: '600' }}>In Sala d'Attesa</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--amber-500)' }}>{countInAttesa}</div>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {/* In Visita Ora */}
+        <div
+          id="counter-card-in-visita"
+          className="card card-hoverable"
+          onClick={() => setStatusFilter(statusFilter === 'In Visita' ? 'ALL' : 'In Visita')}
+          style={{
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            cursor: 'pointer',
+            border: statusFilter === 'In Visita' ? '2px solid var(--purple-500)' : '1px solid var(--border-color)',
+            backgroundColor: statusFilter === 'In Visita' ? 'var(--purple-50)' : '#ffffff',
+            transition: 'var(--transition-fast)'
+          }}
+          title="Filtra visite in corso"
+        >
           <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--purple-50)', color: 'var(--purple-500)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Heart size={18} />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--slate-500)', fontWeight: '600' }}>In Visita Ora</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--purple-500)' }}>{countInVisita}</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--slate-500)', fontWeight: '600' }}>In Visita Ora</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--purple-500)' }}>{countInVisita}</div>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {/* Completati */}
+        <div
+          id="counter-card-completati"
+          className="card card-hoverable"
+          onClick={() => setStatusFilter(statusFilter === 'Completato' ? 'ALL' : 'Completato')}
+          style={{
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            cursor: 'pointer',
+            border: statusFilter === 'Completato' ? '2px solid var(--emerald-500)' : '1px solid var(--border-color)',
+            backgroundColor: statusFilter === 'Completato' ? 'var(--emerald-50)' : '#ffffff',
+            transition: 'var(--transition-fast)'
+          }}
+          title="Filtra visite completate"
+        >
           <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--emerald-50)', color: 'var(--emerald-500)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <CheckCircle2 size={18} />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--slate-500)', fontWeight: '600' }}>Completati</div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '800', color: 'var(--emerald-500)' }}>{countCompletati}</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--slate-500)', fontWeight: '600' }}>Completati</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--emerald-500)' }}>{countCompletati}</div>
           </div>
         </div>
       </div>
