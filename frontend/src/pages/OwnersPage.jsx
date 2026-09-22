@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Users } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
+import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
 import { OwnerCard } from '../components/owners/OwnerCard';
 import { SkeletonGrid } from '../components/common/SkeletonLoaders';
 
 export const OwnersPage = ({ onAddPetForOwner, onNewOwner, onEditOwner, onFilterPetsByOwner, refreshTrigger }) => {
   const { activeClinic } = useClinic();
+  const toast = useToast();
   const [owners, setOwners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -44,9 +46,10 @@ export const OwnersPage = ({ onAddPetForOwner, onNewOwner, onEditOwner, onFilter
       const res = await api.owners.delete(id);
       if (res.success) {
         setOwners((prev) => prev.filter((o) => o._id !== id));
+        toast.success('Proprietario eliminato con successo');
       }
     } catch (err) {
-      alert('Errore durante l\'eliminazione: ' + err.message);
+      toast.error(err.message || 'Errore durante l\'eliminazione del proprietario');
     }
   };
 

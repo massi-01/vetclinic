@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Pill, Filter } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
+import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
 import { TherapyCard } from '../components/therapies/TherapyCard';
 import { SkeletonGrid } from '../components/common/SkeletonLoaders';
 
 export const TherapiesPage = ({ onSelectPet, onNewTherapy, onEditTherapy, refreshTrigger }) => {
   const { activeClinic } = useClinic();
+  const toast = useToast();
   const [therapies, setTherapies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterActive, setFilterActive] = useState('true'); // 'all', 'true', 'false'
@@ -39,9 +41,10 @@ export const TherapiesPage = ({ onSelectPet, onNewTherapy, onEditTherapy, refres
       const res = await api.therapies.delete(id);
       if (res.success) {
         setTherapies((prev) => prev.filter((t) => t._id !== id));
+        toast.success('Prescrizione terapeutica eliminata');
       }
     } catch (err) {
-      alert('Errore durante l\'eliminazione: ' + err.message);
+      toast.error(err.message || 'Errore durante l\'eliminazione della terapia');
     }
   };
 

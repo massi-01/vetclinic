@@ -21,7 +21,20 @@ export const request = async (endpoint, options = {}) => {
     config.body = JSON.stringify(options.body);
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, config);
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, config);
+  } catch (networkErr) {
+    const err = new Error(
+      navigator.onLine === false
+        ? 'Connessione a Internet assente. Verifica la tua rete.'
+        : 'Server non raggiungibile. Verifica che il servizio sia attivo.'
+    );
+    err.status = 503;
+    err.isNetworkError = true;
+    throw err;
+  }
+
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
@@ -30,7 +43,10 @@ export const request = async (endpoint, options = {}) => {
       localStorage.removeItem('vet_token');
       localStorage.removeItem('vet_user');
     }
-    throw new Error(data.message || 'Errore nella richiesta di rete');
+    const error = new Error(data.message || 'Errore nella richiesta di rete');
+    error.status = response.status;
+    error.data = data;
+    throw error;
   }
 
   return data;

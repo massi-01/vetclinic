@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ClinicProvider } from './context/ClinicContext';
+import { ToastProvider, useToast } from './context/ToastContext';
+import { ToastContainer } from './components/common/ToastContainer';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ErrorPage } from './pages/ErrorPage';
 import { LoginPage } from './pages/LoginPage';
 import { LandingPage } from './pages/LandingPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -29,6 +33,7 @@ import { LoadingSpinner } from './components/common/LoadingSpinner';
 
 const MainLayout = () => {
   const { user, loading, login } = useAuth();
+  const toast = useToast();
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [publicView, setPublicView] = useState('landing'); // 'landing' | 'login'
 
@@ -38,6 +43,23 @@ const MainLayout = () => {
       setPublicView('landing');
     }
   }, [user]);
+
+  // Monitoraggio connessione di rete in tempo reale
+  useEffect(() => {
+    const handleOnline = () => {
+      toast.success('Connessione a Internet ripristinata con successo', 'Di nuovo online');
+    };
+    const handleOffline = () => {
+      toast.warning('Connessione assente. Alcune funzionalità potrebbero non rispondere.', 'Dispositivo Offline');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [toast]);
 
   // Modal States
   const [isPetFormOpen, setIsPetFormOpen] = useState(false);
@@ -298,6 +320,68 @@ const MainLayout = () => {
               onEditClinic={handleEditClinic}
             />
           )}
+
+          {currentTab === 'error-404' && (
+            <ErrorPage
+              code="404"
+              onNavigateTab={setCurrentTab}
+              showSwitcher={true}
+            />
+          )}
+
+          {currentTab === 'error-403' && (
+            <ErrorPage
+              code="403"
+              onNavigateTab={setCurrentTab}
+              showSwitcher={true}
+            />
+          )}
+
+          {currentTab === 'error-500' && (
+            <ErrorPage
+              code="500"
+              onNavigateTab={setCurrentTab}
+              showSwitcher={true}
+            />
+          )}
+
+          {currentTab === 'error-offline' && (
+            <ErrorPage
+              code="offline"
+              onNavigateTab={setCurrentTab}
+              showSwitcher={true}
+            />
+          )}
+
+          {currentTab === 'error-preview' && (
+            <ErrorPage
+              code="404"
+              onNavigateTab={setCurrentTab}
+              showSwitcher={true}
+            />
+          )}
+
+          {![
+            'dashboard',
+            'agenda',
+            'pets',
+            'visits',
+            'therapies',
+            'owners',
+            'clinics',
+            'error-404',
+            'error-403',
+            'error-500',
+            'error-offline',
+            'error-preview'
+          ].includes(currentTab) && (
+            <ErrorPage
+              code="404"
+              title="Sezione Non Trovata"
+              description={`La scheda o sezione "${currentTab}" richiesta non esiste nel gestionale.`}
+              onNavigateTab={setCurrentTab}
+            />
+          )}
         </main>
       </div>
 
@@ -330,6 +414,7 @@ const MainLayout = () => {
           if (selectedPetId === savedPet._id) {
             setSelectedPetId(savedPet._id);
           }
+          toast.success('Dati paziente salvati con successo');
           triggerDataRefresh();
         }}
       />
@@ -353,6 +438,7 @@ const MainLayout = () => {
           if (savedVisit?.appuntamento) {
             setLastSavedAppointment(savedVisit.appuntamento);
           }
+          toast.success('Visita clinica registrata e sincronizzata in agenda');
           triggerDataRefresh();
         }}
       />
@@ -363,6 +449,7 @@ const MainLayout = () => {
         defaultPet={therapyDefaultPet}
         initialData={therapyInitialData}
         onTherapySaved={() => {
+          toast.success('Prescrizione terapeutica salvata con successo');
           triggerDataRefresh();
         }}
       />
@@ -372,6 +459,7 @@ const MainLayout = () => {
         onClose={() => setIsOwnerFormOpen(false)}
         initialData={ownerInitialData}
         onOwnerSaved={() => {
+          toast.success('Anagrafica proprietario salvata con successo');
           triggerDataRefresh();
         }}
       />
@@ -381,6 +469,7 @@ const MainLayout = () => {
         onClose={() => setIsClinicFormOpen(false)}
         initialData={clinicInitialData}
         onClinicSaved={() => {
+          toast.success('Dati ambulatorio aggiornati con successo');
           triggerDataRefresh();
         }}
       />
@@ -391,10 +480,10 @@ const MainLayout = () => {
         defaultPet={vaccinationDefaultPet}
         initialData={vaccinationInitialData}
         onVaccinationSaved={() => {
-          // If modal for this pet is open, update
           if (selectedPetId) {
             setSelectedPetId(selectedPetId);
           }
+          toast.success('Vaccino registrato nel libretto sanitario');
           triggerDataRefresh();
         }}
       />
@@ -408,6 +497,7 @@ const MainLayout = () => {
         initialData={appointmentInitialData}
         onAppointmentSaved={(savedApt) => {
           setLastSavedAppointment(savedApt);
+          toast.success('Appuntamento confermato e inserito in agenda');
           triggerDataRefresh();
         }}
       />
@@ -417,10 +507,15 @@ const MainLayout = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ClinicProvider>
-        <MainLayout />
-      </ClinicProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <ToastProvider>
+        <AuthProvider>
+          <ClinicProvider>
+            <MainLayout />
+            <ToastContainer />
+          </ClinicProvider>
+        </AuthProvider>
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }

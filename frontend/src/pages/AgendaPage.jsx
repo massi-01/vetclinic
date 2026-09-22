@@ -17,6 +17,7 @@ import {
   Stethoscope
 } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
+import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
 import { SkeletonAgendaSlots } from '../components/common/SkeletonLoaders';
 
@@ -45,6 +46,7 @@ export const AgendaPage = ({
   onStatusChange
 }) => {
   const { activeClinic } = useClinic();
+  const toast = useToast();
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -118,11 +120,12 @@ export const AgendaPage = ({
         setAppointments((prev) =>
           prev.map((a) => (a._id === appointmentId ? { ...a, ...res.data } : a))
         );
+        toast.success(`Stato aggiornato a "${newStatus}"`);
         if (onStatusChange) onStatusChange();
       }
     } catch (err) {
       setAppointments(previousAppointments);
-      alert('Errore aggiornamento stato: ' + err.message);
+      toast.error(err.message || 'Errore durante l\'aggiornamento dello stato');
     }
   };
 
@@ -132,10 +135,11 @@ export const AgendaPage = ({
       const res = await api.appointments.delete(id);
       if (res.success) {
         setAppointments((prev) => prev.filter((a) => a._id !== id));
+        toast.success('Appuntamento cancellato dall\'agenda');
         if (onStatusChange) onStatusChange();
       }
     } catch (err) {
-      alert('Errore cancellazione: ' + err.message);
+      toast.error(err.message || 'Errore durante la cancellazione dell\'appuntamento');
     }
   };
 

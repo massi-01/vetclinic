@@ -10,7 +10,8 @@ import {
   PlusCircle,
   Stethoscope,
   MapPin,
-  Phone
+  Phone,
+  ShieldAlert
 } from 'lucide-react';
 import { useClinic } from '../../context/ClinicContext';
 
@@ -151,6 +152,32 @@ export const Sidebar = ({ currentTab, onTabChange, onNewVisit, onNewPet }) => {
         >
           <Dog size={16} /> Nuovo Paziente
         </button>
+
+        {import.meta.env.DEV && (
+          <button
+            id="sidebar-btn-error-preview"
+            type="button"
+            onClick={() => onTabChange('error-preview')}
+            style={{
+              marginTop: '0.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem',
+              padding: '0.45rem',
+              borderRadius: '8px',
+              border: '1px dashed var(--slate-300)',
+              background: currentTab === 'error-preview' ? 'var(--slate-100)' : 'transparent',
+              color: 'var(--slate-500)',
+              fontSize: '0.75rem',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            <ShieldAlert size={14} />
+            <span>Anteprima Errori (404/403/500)</span>
+          </button>
+        )}
       </div>
     </aside>
   );

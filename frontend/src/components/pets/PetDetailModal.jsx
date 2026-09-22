@@ -21,6 +21,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { useToast } from '../../context/ToastContext';
 
 export const PetDetailModal = ({
   isOpen,
@@ -31,6 +32,7 @@ export const PetDetailModal = ({
   onNewTherapy,
   onNewVaccination
 }) => {
+  const toast = useToast();
   const [pet, setPet] = useState(null);
   const [vaccinations, setVaccinations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,9 +66,10 @@ export const PetDetailModal = ({
       const res = await api.vaccinations.delete(id);
       if (res.success) {
         setVaccinations((prev) => prev.filter((v) => v._id !== id));
+        toast.success('Vaccino rimosso dal registro sanitario');
       }
     } catch (err) {
-      alert('Errore rimozione vaccino: ' + err.message);
+      toast.error(err.message || 'Errore durante la rimozione del vaccino');
     }
   };
 

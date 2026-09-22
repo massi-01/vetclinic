@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Calendar, Filter, ClipboardList } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
+import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
 import { VisitCard } from '../components/visits/VisitCard';
 import { SkeletonGrid } from '../components/common/SkeletonLoaders';
 
 export const VisitsPage = ({ onSelectPet, onNewVisit, onEditVisit, refreshTrigger }) => {
   const { activeClinic } = useClinic();
+  const toast = useToast();
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState('');
@@ -39,9 +41,10 @@ export const VisitsPage = ({ onSelectPet, onNewVisit, onEditVisit, refreshTrigge
       const res = await api.visits.delete(id);
       if (res.success) {
         setVisits((prev) => prev.filter((v) => v._id !== id));
+        toast.success('Referto di visita clinica eliminato');
       }
     } catch (err) {
-      alert('Errore durante l\'eliminazione: ' + err.message);
+      toast.error(err.message || 'Errore durante l\'eliminazione della visita');
     }
   };
 
