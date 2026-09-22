@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { dataStore } from '../services/dataStore.js';
+import { getJwtSecret } from '../config/jwt.js';
 
 export const protect = async (req, res, next) => {
   let token;
@@ -16,7 +17,7 @@ export const protect = async (req, res, next) => {
   }
 
   try {
-    const secret = process.env.JWT_SECRET || 'vetclinic_jwt_super_secret_key_2026_dev';
+    const secret = getJwtSecret();
     const decoded = jwt.verify(token, secret);
     const user = await dataStore.findUserById(decoded.id);
 

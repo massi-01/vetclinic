@@ -29,6 +29,11 @@ const generateId = () => new mongoose.Types.ObjectId().toString();
 
 // Dati dimostrativi iniziali (Seed Data)
 export const initSeedData = async () => {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SEED !== 'true') {
+    console.log('🔒 Ambiente di produzione: popolamento dati seed dimostrativi disattivato.');
+    return;
+  }
+
   const hashedPassword = await bcrypt.hash('Password123!', 10);
 
   const clinic1Id = generateId();

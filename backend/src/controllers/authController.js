@@ -1,10 +1,11 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { dataStore } from '../services/dataStore.js';
+import { getJwtSecret } from '../config/jwt.js';
 
 const generateToken = (id) => {
-  const secret = process.env.JWT_SECRET || 'vetclinic_jwt_super_secret_key_2026_dev';
-  return jwt.sign({ id }, secret, { expiresIn: '30d' });
+  const secret = getJwtSecret();
+  return jwt.sign({ id }, secret, { expiresIn: '7d' });
 };
 
 export const login = async (req, res) => {
@@ -27,10 +28,7 @@ export const login = async (req, res) => {
       });
     }
 
-    let isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch && email.toLowerCase() === 'dr.rossi@vetclinic.it' && (password === 'Password123!' || password === 'password123')) {
-      isMatch = true;
-    }
+    const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
       return res.status(401).json({

@@ -6,8 +6,8 @@ export const LoginPage = () => {
   const { login, register } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
 
-  const [email, setEmail] = useState('dr.rossi@vetclinic.it');
-  const [password, setPassword] = useState('Password123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   
   // Campi extra per la registrazione
   const [nome, setNome] = useState('');
@@ -119,8 +119,8 @@ export const LoginPage = () => {
           </p>
         </div>
 
-        {/* Demo Fast Login Banner */}
-        {!isRegistering && (
+        {/* Demo Fast Login Banner (esposto unicamente in ambiente di sviluppo) */}
+        {!isRegistering && import.meta.env.DEV && (
           <div
             style={{
               padding: '0.85rem',
