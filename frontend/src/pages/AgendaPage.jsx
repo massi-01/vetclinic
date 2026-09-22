@@ -38,7 +38,8 @@ export const AgendaPage = ({
   onNewAppointment,
   onEditAppointment,
   refreshTrigger,
-  lastSavedAppointment
+  lastSavedAppointment,
+  onStatusChange
 }) => {
   const { activeClinic } = useClinic();
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -103,14 +104,21 @@ export const AgendaPage = ({
   };
 
   const handleStatusChange = async (appointmentId, newStatus) => {
+    const previousAppointments = appointments;
     try {
+      // Aggiornamento ottimistico immediato
+      setAppointments((prev) =>
+        prev.map((a) => (a._id === appointmentId ? { ...a, stato: newStatus } : a))
+      );
       const res = await api.appointments.updateStatus(appointmentId, newStatus);
-      if (res.success) {
+      if (res.success && res.data) {
         setAppointments((prev) =>
-          prev.map((a) => (a._id === appointmentId ? { ...a, stato: newStatus } : a))
+          prev.map((a) => (a._id === appointmentId ? { ...a, ...res.data } : a))
         );
+        if (onStatusChange) onStatusChange();
       }
     } catch (err) {
+      setAppointments(previousAppointments);
       alert('Errore aggiornamento stato: ' + err.message);
     }
   };
@@ -121,6 +129,7 @@ export const AgendaPage = ({
       const res = await api.appointments.delete(id);
       if (res.success) {
         setAppointments((prev) => prev.filter((a) => a._id !== id));
+        if (onStatusChange) onStatusChange();
       }
     } catch (err) {
       alert('Errore cancellazione: ' + err.message);

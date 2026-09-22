@@ -221,6 +221,7 @@ const MainLayout = () => {
               onEditAppointment={handleEditAppointment}
               refreshTrigger={dataRefreshTrigger}
               lastSavedAppointment={lastSavedAppointment}
+              onStatusChange={triggerDataRefresh}
             />
           )}
 

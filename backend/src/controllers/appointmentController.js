@@ -164,6 +164,55 @@ export const updateAppointment = async (req, res) => {
   }
 };
 
+export const updateAppointmentStatus = async (req, res) => {
+  try {
+    const { stato } = req.body;
+    if (!stato) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lo stato è obbligatorio'
+      });
+    }
+
+    const validStates = ['Prenotato', 'Confermato', 'In Attesa', 'In Visita', 'Completato', 'Annullato'];
+    if (!validStates.includes(stato)) {
+      return res.status(400).json({
+        success: false,
+        message: `Stato non valido. Valori ammessi: ${validStates.join(', ')}`
+      });
+    }
+
+    const existing = await dataStore.getAppointmentById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appuntamento non trovato'
+      });
+    }
+
+    const currentClinicId = existing.ambulatorioId?._id || existing.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, currentClinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato a modificare questo appuntamento'
+      });
+    }
+
+    const app = await dataStore.updateAppointment(req.params.id, { stato });
+    res.json({
+      success: true,
+      data: app
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Errore durante l'aggiornamento dello stato dell'appuntamento",
+      error: error.message
+    });
+  }
+};
+
 export const deleteAppointment = async (req, res) => {
   try {
     const existing = await dataStore.getAppointmentById(req.params.id);

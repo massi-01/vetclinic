@@ -4,6 +4,7 @@ import {
   getAppointmentById,
   createAppointment,
   updateAppointment,
+  updateAppointmentStatus,
   deleteAppointment
 } from '../controllers/appointmentController.js';
 import { protect } from '../middlewares/auth.js';
@@ -16,9 +17,13 @@ router.route('/')
   .get(getAppointments)
   .post(createAppointment);
 
+router.patch('/:id/status', updateAppointmentStatus);
+router.put('/:id/status', updateAppointmentStatus);
+
 router.route('/:id')
   .get(getAppointmentById)
   .put(updateAppointment)
+  .patch(updateAppointment)
   .delete(deleteAppointment);
 
 export default router;

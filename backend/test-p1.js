@@ -130,6 +130,28 @@ async function runTests() {
   assert.strictEqual(vacsAfter.length, 0, 'I vaccini dell\'animale devono essere cancellati');
   console.log('   ✅ Record clinici orfani eliminati a cascata con successo.\n');
 
+  // Test 6: Verifica aggiornamento stato appuntamento
+  console.log('6. Verifica aggiornamento stato appuntamento...');
+  const allPets = await dataStore.getPets(clinic1._id);
+  const samplePet = allPets[0];
+  const appToUpdate = await dataStore.createAppointment({
+    data: '2026-11-21',
+    oraInizio: '10:00',
+    oraFine: '10:30',
+    motivo: 'Controllo stato',
+    animaleId: samplePet._id,
+    ambulatorioId: clinic1._id,
+    stato: 'Prenotato'
+  });
+  assert.strictEqual(appToUpdate.stato, 'Prenotato');
+
+  const updatedApp = await dataStore.updateAppointment(appToUpdate._id, { stato: 'In Visita' });
+  assert.strictEqual(updatedApp.stato, 'In Visita', 'Lo stato deve essere aggiornato a In Visita');
+
+  const cancelledApp = await dataStore.updateAppointment(appToUpdate._id, { stato: 'Annullato' });
+  assert.strictEqual(cancelledApp.stato, 'Annullato', 'Lo stato deve essere aggiornato ad Annullato');
+  console.log('   ✅ Cambio di stato appuntamento gestito correttamente senza conflitti.\n');
+
   console.log('🎉 TUTTI I TEST P1 SONO STATI SUPERATI CON SUCCESSO!');
 }
 

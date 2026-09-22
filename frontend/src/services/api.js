@@ -110,6 +110,7 @@ export const api = {
     getById: (id) => request(`/appointments/${id}`),
     create: (data) => request('/appointments', { method: 'POST', body: data }),
     update: (id, data) => request(`/appointments/${id}`, { method: 'PUT', body: data }),
+    updateStatus: (id, stato) => request(`/appointments/${id}/status`, { method: 'PATCH', body: { stato } }),
     delete: (id) => request(`/appointments/${id}`, { method: 'DELETE' })
   },
   stats: {
