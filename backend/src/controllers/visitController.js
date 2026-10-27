@@ -38,12 +38,19 @@ export const getVisitById = async (req, res) => {
 
     // Recupera anche le terapie prescritte in questa visita
     const therapies = await dataStore.getTherapies(null, { petId: visit.animaleId?._id || visit.animaleId }, req.user?._id);
-    const visitTherapies = therapies.filter((t) => t.visitaId?.toString() === visit._id.toString());
+    const visitIdStr = visit._id.toString();
+    const visitTherapies = therapies.filter((t) => {
+      const vId = (t.visitaId?._id || t.visitaId)?.toString();
+      return vId === visitIdStr;
+    });
+
+    // Converti Mongoose doc in plain object prima dello spread per preservare tutte le proprietà
+    const visitObj = typeof visit.toObject === 'function' ? visit.toObject() : (visit._doc ? { ...visit._doc } : { ...visit });
 
     res.json({
       success: true,
       data: {
-        ...visit,
+        ...visitObj,
         terapiePrescritte: visitTherapies
       }
     });

@@ -16,43 +16,117 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { useClinic } from '../../context/ClinicContext';
+import { useAuth } from '../../context/AuthContext';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 
-export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId }) => {
-  const [visit, setVisit] = useState(initialVisit);
+export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId, pet: defaultPet }) => {
+  const { activeClinic } = useClinic();
+  const { user } = useAuth();
+  const [visit, setVisit] = useState(initialVisit || null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setError('');
+      return;
+    }
+
+    // Se initialVisit è fornito, aggiorna immediatamente lo stato locale
+    if (initialVisit) {
+      const cleanInitial = initialVisit?._doc ? { ...initialVisit._doc, ...initialVisit } : initialVisit;
+      setVisit(cleanInitial);
+    }
 
     const targetId = initialVisit?._id || visitId;
     if (targetId) {
-      loadFullVisitDetails(targetId);
+      // Se abbiamo già dati completi (inclusi animaleId e motivo), non bloccare con spinner full screen
+      const hasCompleteInitial = Boolean(
+        initialVisit &&
+        initialVisit.motivo &&
+        initialVisit.animaleId &&
+        typeof initialVisit.animaleId === 'object'
+      );
+      loadFullVisitDetails(targetId, hasCompleteInitial);
     } else if (initialVisit) {
-      setVisit(initialVisit);
+      setLoading(false);
     }
   }, [isOpen, initialVisit, visitId]);
 
-  const loadFullVisitDetails = async (id) => {
+  const loadFullVisitDetails = async (id, hasCompleteInitial) => {
     try {
-      setLoading(true);
+      if (!hasCompleteInitial) {
+        setLoading(true);
+      }
       setError('');
       const res = await api.visits.getById(id);
       if (res.success && res.data) {
-        setVisit(res.data);
+        const raw = res.data;
+        const clean = raw?._doc ? { ...raw._doc, ...raw } : raw;
+        setVisit((prev) => {
+          return {
+            ...(prev || {}),
+            ...clean,
+            animaleId: (clean.animaleId && typeof clean.animaleId === 'object')
+              ? clean.animaleId
+              : (prev?.animaleId || defaultPet),
+            ambulatorioId: (clean.ambulatorioId && typeof clean.ambulatorioId === 'object')
+              ? clean.ambulatorioId
+              : (prev?.ambulatorioId || activeClinic),
+            veterinarioId: (clean.veterinarioId && typeof clean.veterinarioId === 'object')
+              ? clean.veterinarioId
+              : (prev?.veterinarioId || user),
+            terapiePrescritte: Array.isArray(clean.terapiePrescritte)
+              ? clean.terapiePrescritte
+              : (prev?.terapiePrescritte || [])
+          };
+        });
       }
     } catch (err) {
       console.error('Errore caricamento dettagli referto:', err);
-      // Mantieni initialVisit se la chiamata fallisce
-      if (initialVisit) setVisit(initialVisit);
-      else setError('Impossibile caricare i dati completi della visita');
+      if (!hasCompleteInitial && !visit && !initialVisit) {
+        setError('Impossibile caricare i dati completi della visita');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   if (!isOpen) return null;
+
+  // Risoluzione robusta delle entità collegate con fallback intelligente
+  const pet = (visit?.animaleId && typeof visit.animaleId === 'object')
+    ? visit.animaleId
+    : (defaultPet && typeof defaultPet === 'object' ? defaultPet : null);
+
+  const owner = (pet?.proprietarioId && typeof pet.proprietarioId === 'object')
+    ? pet.proprietarioId
+    : (visit?.proprietarioId && typeof visit.proprietarioId === 'object' ? visit.proprietarioId : null);
+
+  const clinic = (visit?.ambulatorioId && typeof visit.ambulatorioId === 'object')
+    ? visit.ambulatorioId
+    : (activeClinic || null);
+
+  const vet = (visit?.veterinarioId && typeof visit.veterinarioId === 'object')
+    ? visit.veterinarioId
+    : (user ? { nome: user.nome, cognome: user.cognome, codiceAlbo: user.codiceAlbo, email: user.email, telefono: user.telefono } : null);
+
+  const therapies = Array.isArray(visit?.terapiePrescritte) ? visit.terapiePrescritte : [];
+
+  const visitDateFormatted = visit?.data
+    ? new Date(visit.data).toLocaleDateString('it-IT', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      })
+    : new Date().toLocaleDateString('it-IT', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+
+  const protocolNumber = `REF-${visit?._id ? visit._id.toString().slice(-6).toUpperCase() : 'VISITA'}`;
 
   const handlePrint = () => {
     window.print();
@@ -73,7 +147,7 @@ export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId
       <html lang="it">
       <head>
         <meta charset="UTF-8">
-        <title>Referto Visita - ${visit?.animaleId?.nome || 'Paziente'}</title>
+        <title>Referto Visita - ${pet?.nome || 'Paziente'}</title>
         <style>
           @page { size: A4 portrait; margin: 12mm 15mm; }
           body {
@@ -84,24 +158,26 @@ export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId
             background: #ffffff;
             font-size: 11pt;
             line-height: 1.5;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           * { box-sizing: border-box; }
           .visit-report-sheet { width: 100%; max-width: 100%; margin: 0; padding: 0; }
           .report-clinic-header { display: flex; justify-content: space-between; border-bottom: 2px solid #0d9488; padding-bottom: 12px; margin-bottom: 16px; }
-          .report-title-banner { background: #0f172a; color: #ffffff; padding: 8px 14px; border-radius: 6px; display: flex; justify-content: space-between; margin-bottom: 16px; font-weight: bold; }
+          .report-title-banner { background: #0f172a !important; color: #ffffff !important; padding: 8px 14px; border-radius: 6px; display: flex; justify-content: space-between; margin-bottom: 16px; font-weight: bold; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .report-grid-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
-          .report-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; }
-          .report-box-title { font-size: 8.5pt; font-weight: 800; text-transform: uppercase; color: #0d9488; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+          .report-box { background: #f8fafc !important; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          .report-box-title { font-size: 8.5pt; font-weight: 800; text-transform: uppercase; color: #0d9488; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; display: flex; align-items: center; gap: 4px; }
           .report-info-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 9.5pt; }
           .report-info-label { color: #64748b; }
           .report-info-value { font-weight: bold; color: #0f172a; }
           .report-vitals-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
-          .report-vital-card { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; text-align: center; }
+          .report-vital-card { background: #ffffff !important; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; text-align: center; }
           .report-section { margin-bottom: 14px; break-inside: avoid; }
-          .report-section-title { font-size: 9pt; font-weight: 800; text-transform: uppercase; color: #1e293b; margin-bottom: 4px; }
-          .report-text-block { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; font-size: 9.5pt; white-space: pre-wrap; }
+          .report-section-title { font-size: 9pt; font-weight: 800; text-transform: uppercase; color: #1e293b; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+          .report-text-block { background: #ffffff !important; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; font-size: 9.5pt; white-space: pre-wrap; }
           .report-therapy-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 6px; }
-          .report-therapy-table th { background: #f1f5f9; padding: 6px 10px; border: 1px solid #cbd5e1; text-align: left; }
+          .report-therapy-table th { background: #f1f5f9 !important; padding: 6px 10px; border: 1px solid #cbd5e1; text-align: left; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .report-therapy-table td { padding: 6px 10px; border: 1px solid #cbd5e1; }
           .report-signature-block { margin-top: 28px; display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #cbd5e1; padding-top: 16px; break-inside: avoid; }
         </style>
@@ -120,22 +196,6 @@ export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId
     `);
     printWindow.document.close();
   };
-
-  const pet = visit?.animaleId;
-  const owner = pet?.proprietarioId;
-  const clinic = visit?.ambulatorioId;
-  const vet = visit?.veterinarioId;
-  const therapies = visit?.terapiePrescritte || [];
-
-  const visitDateFormatted = visit?.data
-    ? new Date(visit.data).toLocaleDateString('it-IT', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      })
-    : '';
-
-  const protocolNumber = `REF-${visit?._id ? visit._id.toString().slice(-6).toUpperCase() : 'VISITA'}`;
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1100 }}>

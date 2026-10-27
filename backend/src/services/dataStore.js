@@ -1239,7 +1239,8 @@ export const dataStore = {
         .populate({ path: 'animaleId', populate: { path: 'proprietarioId' } })
         .populate('veterinarioId', 'nome cognome email telefono codiceAlbo ruolo')
         .populate('ambulatorioId')
-        .sort({ data: -1, createdAt: -1 });
+        .sort({ data: -1, createdAt: -1 })
+        .lean();
       if (limit) q = q.limit(Number(limit));
       return await q;
     }
@@ -1283,7 +1284,8 @@ export const dataStore = {
       return await Visit.findById(id)
         .populate({ path: 'animaleId', populate: { path: 'proprietarioId' } })
         .populate('veterinarioId', 'nome cognome email telefono codiceAlbo ruolo')
-        .populate('ambulatorioId');
+        .populate('ambulatorioId')
+        .lean();
     }
     const visit = memoryData.visits.find((v) => v._id.toString() === id.toString());
     if (!visit) return null;

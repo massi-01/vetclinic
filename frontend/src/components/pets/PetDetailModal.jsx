@@ -753,6 +753,7 @@ export const PetDetailModal = ({
           isOpen={Boolean(selectedVisitForReport)}
           onClose={() => setSelectedVisitForReport(null)}
           visit={selectedVisitForReport}
+          pet={pet}
         />
       </div>
     </div>

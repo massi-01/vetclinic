@@ -1840,7 +1840,28 @@ a {
     padding: 0 !important;
   }
 
-  /* Nascondi tutti i componenti applicativi */
+  /* Isola completamente il foglio del referto clinico eliminando elementi applicativi */
+  body {
+    visibility: hidden !important;
+  }
+
+  #printable-visit-report,
+  #printable-visit-report * {
+    visibility: visible !important;
+  }
+
+  #printable-visit-report {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
   .navbar,
   .sidebar,
   .bottom-nav,
@@ -1848,34 +1869,8 @@ a {
   .toast-container,
   .modal-header,
   .no-print,
-  button:not(.print-include) {
+  button {
     display: none !important;
-  }
-
-  .modal-overlay {
-    position: static !important;
-    background: transparent !important;
-    padding: 0 !important;
-    display: block !important;
-  }
-
-  .modal-content {
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
-    background: transparent !important;
-  }
-
-  .visit-report-sheet {
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
   }
 
   .report-box {
