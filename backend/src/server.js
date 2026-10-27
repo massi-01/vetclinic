@@ -98,6 +98,11 @@ app.use('/api', apiLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
+// Reindirizzamento automatico della root alla documentazione interattiva Swagger
+app.get('/', (req, res) => {
+  res.redirect('/api-docs');
+});
+
 // Health check endpoint strutturato con enterprise observability
 app.get('/api/health', (req, res) => {
   const mongoReady = mongoose.connection.readyState === 1;
