@@ -39,27 +39,64 @@ app.use(
   })
 );
 
-// Configurazione CORS restrittiva
+// Configurazione CORS (supporto Vercel, localhost e origini configurate)
 const configuredClients = process.env.CLIENT_URL
-  ? process.env.CLIENT_URL.split(',').map((u) => u.trim())
+  ? process.env.CLIENT_URL.split(',').map((u) => u.trim().replace(/\/$/, ''))
   : [];
 
-const defaultLocalClients = ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173'];
-const allowedOrigins = [...configuredClients, ...(process.env.NODE_ENV !== 'production' ? defaultLocalClients : [])];
+const defaultLocalClients = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173'
+];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // In sviluppo permetti chiamate da mobile app/curl/Postman o origini localhost
-      if (!origin || allowedOrigins.includes(origin) || (process.env.NODE_ENV !== 'production' && origin.startsWith('http://localhost:'))) {
-        callback(null, true);
-      } else {
-        callback(new Error(`Origine non autorizzata dalle policy CORS: ${origin}`));
+      // 1. Chiamate senza origin (mobile app, curl, server-to-server, Postman)
+      if (!origin) {
+        return callback(null, true);
       }
+
+      const cleanOrigin = origin.replace(/\/$/, '');
+
+      // 2. Se CLIENT_URL è '*' consenti tutto
+      if (configuredClients.includes('*')) {
+        return callback(null, true);
+      }
+
+      // 3. Origini localhost (sviluppo locale)
+      if (
+        cleanOrigin.startsWith('http://localhost:') ||
+        cleanOrigin.startsWith('http://127.0.0.1:')
+      ) {
+        return callback(null, true);
+      }
+
+      // 4. Domini Vercel (*.vercel.app, inclusi Swagger UI backend e frontend Vercel)
+      try {
+        const parsed = new URL(origin);
+        if (parsed.hostname === 'vercel.app' || parsed.hostname.endsWith('.vercel.app')) {
+          return callback(null, true);
+        }
+      } catch {
+        if (cleanOrigin.endsWith('.vercel.app')) {
+          return callback(null, true);
+        }
+      }
+
+      // 5. Origini esplicitamente consentite da CLIENT_URL o default locali
+      if (configuredClients.includes(cleanOrigin) || defaultLocalClients.includes(cleanOrigin)) {
+        return callback(null, true);
+      }
+
+      logger.warn(`Richiesta bloccata da policy CORS per origine: ${origin}`);
+      callback(new Error(`Origine non autorizzata dalle policy CORS: ${origin}`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
   })
 );
 
