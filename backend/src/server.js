@@ -132,12 +132,65 @@ app.get('/api/health', (req, res) => {
   res.status(statusCode).json(healthData);
 });
 
-// Documentazione interattiva OpenAPI / Swagger (abilitata di default in dev o con flag esplicita)
-if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_SWAGGER === 'true') {
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-  app.get('/api-docs.json', (req, res) => {
+// Documentazione interattiva OpenAPI / Swagger (abilitata di default tranne se DISABLE_SWAGGER=true)
+if (process.env.DISABLE_SWAGGER !== 'true') {
+  // 1. Specifiche OpenAPI JSON
+  app.get(['/api-docs.json', '/api/docs.json'], (req, res) => {
     res.json(swaggerDocument);
   });
+
+  // 2. Swagger UI standalone caricato da CDN (pienamente compatibile con Vercel Serverless)
+  const renderSwaggerUi = (req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>VetClinic Pro API - Swagger UI</title>
+  <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css" />
+  <link rel="icon" type="image/png" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/favicon-32x32.png" sizes="32x32" />
+  <style>
+    html { box-sizing: border-box; overflow-y: scroll; }
+    *, *:before, *:after { box-sizing: inherit; }
+    body { margin: 0; background: #fafafa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    .topbar { display: none !important; }
+    .swagger-ui .info { margin: 20px 0; }
+    .swagger-ui .info .title { font-size: 26px; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-standalone-preset.min.js"></script>
+  <script>
+    window.onload = function() {
+      window.ui = SwaggerUIBundle({
+        spec: ${JSON.stringify(swaggerDocument)},
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "StandaloneLayout"
+      });
+    };
+  </script>
+</body>
+</html>`);
+  };
+
+  // Supporta sia /api-docs che /api/docs che /docs
+  app.get('/api-docs', renderSwaggerUi);
+  app.get('/api-docs/*', renderSwaggerUi);
+  app.get('/api/docs', renderSwaggerUi);
+  app.get('/docs', renderSwaggerUi);
+
+  // Fallback con swaggerUi standard
+  app.use('/api-docs-raw', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 }
 
 // Registrazione rotte API
