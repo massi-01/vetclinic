@@ -28,6 +28,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Abilita trust proxy per corretta identificazione IP dietro proxy (Vercel, Nginx, Cloudflare)
+app.set('trust proxy', 1);
+
 
 // Header di sicurezza HTTP con Helmet
 app.use(
@@ -180,5 +183,10 @@ const startServer = async () => {
   });
 };
 
-startServer();
+// Avvia il server solo in ambiente non-serverless (in locale, Docker o VPS)
+if (process.env.VERCEL !== '1') {
+  startServer();
+}
+
+export default app;
 

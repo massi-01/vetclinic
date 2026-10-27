@@ -427,16 +427,20 @@ export const initSeedData = async () => {
     try {
       const userCount = await User.countDocuments();
       if (userCount === 0) {
-        console.log('🌱 Popolamento iniziale di MongoDB con dati dimostrativi...');
-        await Clinic.insertMany(clinics);
-        await User.insertMany(users);
-        await Owner.insertMany(owners);
-        await Pet.insertMany(pets);
-        await Visit.insertMany(visits);
-        await Therapy.insertMany(therapies);
-        await Vaccination.insertMany(vaccinations);
-        await Appointment.insertMany(appointments);
-        console.log('✅ MongoDB popolato con successo!');
+        if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SEED !== 'true') {
+          console.log('ℹ️ [Production]: Database MongoDB vuoto. Popolamento automatico demo disabilitato per sicurezza (impostare ALLOW_SEED=true per abilitare il seed).');
+        } else {
+          console.log('🌱 Popolamento iniziale di MongoDB con dati dimostrativi...');
+          await Clinic.insertMany(clinics);
+          await User.insertMany(users);
+          await Owner.insertMany(owners);
+          await Pet.insertMany(pets);
+          await Visit.insertMany(visits);
+          await Therapy.insertMany(therapies);
+          await Vaccination.insertMany(vaccinations);
+          await Appointment.insertMany(appointments);
+          console.log('✅ MongoDB popolato con successo!');
+        }
       } else {
         // Assicurati che le cliniche esistenti abbiano creatoreId impostato
         const dbVet = await User.findOne({ email: 'dr.rossi@vetclinic.it' });

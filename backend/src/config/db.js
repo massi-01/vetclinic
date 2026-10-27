@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 export let isMongoConnected = false;
+let cachedPromise = null;
 
 export const connectDB = async () => {
   const uri = process.env.MONGODB_URI;
@@ -17,10 +18,27 @@ export const connectDB = async () => {
     return false;
   }
 
+  // Se già connesso (fondamentale per riuso istanze in serverless/Vercel)
+  if (mongoose.connection.readyState >= 1) {
+    isMongoConnected = true;
+    return true;
+  }
+
+  if (cachedPromise) {
+    try {
+      await cachedPromise;
+      isMongoConnected = mongoose.connection.readyState >= 1;
+      return isMongoConnected;
+    } catch {
+      cachedPromise = null;
+    }
+  }
+
   try {
-    await mongoose.connect(uri, {
+    cachedPromise = mongoose.connect(uri, {
       serverSelectionTimeoutMS: 5000
     });
+    await cachedPromise;
     isMongoConnected = true;
     console.log('✅ Connesso con successo a MongoDB:', mongoose.connection.host);
     return true;
