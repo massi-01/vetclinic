@@ -28,6 +28,26 @@ export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('report-modal-open');
+    } else {
+      document.body.classList.remove('report-modal-open');
+    }
+    return () => {
+      document.body.classList.remove('report-modal-open');
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    return () => {
+      const iframe = document.getElementById('print-visit-iframe');
+      if (iframe && iframe.parentNode) {
+        iframe.parentNode.removeChild(iframe);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isOpen) {
       setError('');
       return;
@@ -128,8 +148,211 @@ export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId
 
   const protocolNumber = `REF-${visit?._id ? visit._id.toString().slice(-6).toUpperCase() : 'VISITA'}`;
 
+  const generatePrintDocumentHtml = (contentHtml, patientName) => `
+    <!DOCTYPE html>
+    <html lang="it">
+    <head>
+      <meta charset="UTF-8">
+      <title>Referto Visita - ${patientName || 'Paziente'}</title>
+      <style>
+        @page {
+          size: A4 portrait;
+          margin: 10mm 12mm;
+        }
+        :root {
+          --primary: #0d9488;
+          --primary-subtle: #f0fdfa;
+          --primary-light: #ccfbf1;
+          --slate-900: #0f172a;
+          --slate-800: #1e293b;
+          --slate-700: #334155;
+          --slate-600: #475569;
+          --slate-500: #64748b;
+          --slate-400: #94a3b8;
+          --slate-200: #e2e8f0;
+          --slate-100: #f1f5f9;
+          --slate-50: #f8fafc;
+        }
+        * {
+          box-sizing: border-box;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        html, body {
+          margin: 0;
+          padding: 0;
+          background: #ffffff !important;
+          color: #0f172a !important;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+          font-size: 9.5pt;
+          line-height: 1.4;
+        }
+        .visit-report-sheet {
+          width: 100%;
+          max-width: 100%;
+          margin: 0;
+          padding: 0;
+        }
+        .report-clinic-header {
+          display: flex;
+          justify-content: space-between;
+          border-bottom: 2px solid #0d9488;
+          padding-bottom: 8px;
+          margin-bottom: 10px;
+        }
+        .report-title-banner {
+          background: #0f172a !important;
+          color: #ffffff !important;
+          padding: 6px 12px;
+          border-radius: 6px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 10px;
+          font-weight: bold;
+          font-size: 8.8pt;
+        }
+        .report-grid-two-col {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          margin-bottom: 10px;
+        }
+        .report-box {
+          background: #f8fafc !important;
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          padding: 8px 12px;
+        }
+        .report-box-title {
+          font-size: 8pt;
+          font-weight: 800;
+          text-transform: uppercase;
+          color: #0d9488;
+          margin-bottom: 5px;
+          border-bottom: 1px solid #e2e8f0;
+          padding-bottom: 3px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .report-info-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 2.5px;
+          font-size: 8.5pt;
+        }
+        .report-info-label {
+          color: #64748b;
+        }
+        .report-info-value {
+          font-weight: bold;
+          color: #0f172a;
+        }
+        .report-vitals-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 8px;
+          margin-bottom: 10px;
+        }
+        .report-vital-card {
+          background: #ffffff !important;
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          padding: 5px 4px;
+          text-align: center;
+        }
+        .report-section {
+          margin-bottom: 10px;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        .report-section-title {
+          font-size: 8.2pt;
+          font-weight: 800;
+          text-transform: uppercase;
+          color: #1e293b;
+          margin-bottom: 3px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .report-text-block {
+          background: #ffffff !important;
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          padding: 7px 12px;
+          font-size: 8.6pt;
+          white-space: pre-wrap;
+        }
+        .report-therapy-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 8.2pt;
+          margin-top: 4px;
+        }
+        .report-therapy-table th {
+          background: #f1f5f9 !important;
+          padding: 4px 8px;
+          border: 1px solid #cbd5e1;
+          text-align: left;
+        }
+        .report-therapy-table td {
+          padding: 4px 8px;
+          border: 1px solid #cbd5e1;
+        }
+        .report-signature-block {
+          margin-top: 16px;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          border-top: 1px solid #cbd5e1;
+          padding-top: 10px;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+      </style>
+    </head>
+    <body>
+      ${contentHtml}
+    </body>
+    </html>
+  `;
+
   const handlePrint = () => {
-    window.print();
+    const printContent = document.getElementById('printable-visit-report');
+    if (!printContent) return;
+
+    let iframe = document.getElementById('print-visit-iframe');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'print-visit-iframe';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.style.opacity = '0';
+      iframe.style.pointerEvents = 'none';
+      document.body.appendChild(iframe);
+    }
+
+    const html = generatePrintDocumentHtml(printContent.innerHTML, pet?.nome);
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    setTimeout(() => {
+      try {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      } catch (err) {
+        console.error('Errore stampa iframe:', err);
+        window.print();
+      }
+    }, 250);
   };
 
   const handleOpenPrintWindow = () => {
@@ -142,57 +365,17 @@ export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId
       return;
     }
 
+    const html = generatePrintDocumentHtml(printContent.innerHTML, pet?.nome);
+    printWindow.document.open();
     printWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="it">
-      <head>
-        <meta charset="UTF-8">
-        <title>Referto Visita - ${pet?.nome || 'Paziente'}</title>
-        <style>
-          @page { size: A4 portrait; margin: 12mm 15mm; }
-          body {
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 15px;
-            color: #0f172a;
-            background: #ffffff;
-            font-size: 11pt;
-            line-height: 1.5;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          * { box-sizing: border-box; }
-          .visit-report-sheet { width: 100%; max-width: 100%; margin: 0; padding: 0; }
-          .report-clinic-header { display: flex; justify-content: space-between; border-bottom: 2px solid #0d9488; padding-bottom: 12px; margin-bottom: 16px; }
-          .report-title-banner { background: #0f172a !important; color: #ffffff !important; padding: 8px 14px; border-radius: 6px; display: flex; justify-content: space-between; margin-bottom: 16px; font-weight: bold; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .report-grid-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
-          .report-box { background: #f8fafc !important; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .report-box-title { font-size: 8.5pt; font-weight: 800; text-transform: uppercase; color: #0d9488; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; display: flex; align-items: center; gap: 4px; }
-          .report-info-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 9.5pt; }
-          .report-info-label { color: #64748b; }
-          .report-info-value { font-weight: bold; color: #0f172a; }
-          .report-vitals-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
-          .report-vital-card { background: #ffffff !important; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; text-align: center; }
-          .report-section { margin-bottom: 14px; break-inside: avoid; }
-          .report-section-title { font-size: 9pt; font-weight: 800; text-transform: uppercase; color: #1e293b; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
-          .report-text-block { background: #ffffff !important; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; font-size: 9.5pt; white-space: pre-wrap; }
-          .report-therapy-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 6px; }
-          .report-therapy-table th { background: #f1f5f9 !important; padding: 6px 10px; border: 1px solid #cbd5e1; text-align: left; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .report-therapy-table td { padding: 6px 10px; border: 1px solid #cbd5e1; }
-          .report-signature-block { margin-top: 28px; display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #cbd5e1; padding-top: 16px; break-inside: avoid; }
-        </style>
-      </head>
-      <body>
-        ${printContent.innerHTML}
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-            }, 300);
-          };
-        </script>
-      </body>
-      </html>
+      ${html}
+      <script>
+        window.onload = function() {
+          setTimeout(function() {
+            window.print();
+          }, 300);
+        };
+      </script>
     `);
     printWindow.document.close();
   };
