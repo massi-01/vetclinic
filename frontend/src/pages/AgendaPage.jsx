@@ -14,12 +14,14 @@ import {
   Search,
   Filter,
   Check,
-  Stethoscope
+  Stethoscope,
+  Printer
 } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
 import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
 import { SkeletonAgendaSlots } from '../components/common/SkeletonLoaders';
+import { VisitReportModal } from '../components/visits/VisitReportModal';
 
 const TIME_SLOTS = [
   '08:30', '09:00', '09:30', '10:00', '10:30', '11:00',
@@ -51,6 +53,7 @@ export const AgendaPage = ({
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [reportVisitId, setReportVisitId] = useState(null);
 
   const loadAppointments = async (showLoadingSpinner = true) => {
     try {
@@ -499,7 +502,7 @@ export const AgendaPage = ({
                   {/* Slot Time Label */}
                   <div
                     style={{
-                      width: '75px',
+                      width: '80px',
                       flexShrink: 0,
                       backgroundColor: 'var(--slate-50)',
                       borderRight: '1px solid var(--border-color)',
@@ -507,155 +510,263 @@ export const AgendaPage = ({
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      gap: '0.25rem',
                       fontWeight: '700',
                       fontSize: '0.85rem',
                       color: 'var(--slate-700)',
                       padding: '0.5rem'
                     }}
                   >
-                    {slot}
+                    <span>{slot}</span>
+                    {isOccupied && (
+                      <button
+                        onClick={() => onNewAppointment({ date: selectedDate, time: slot })}
+                        title={`Aggiungi un'altra visita alle ${slot}`}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          color: 'var(--primary)',
+                          padding: '2px 4px',
+                          borderRadius: '4px',
+                          fontSize: '0.7rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px'
+                        }}
+                      >
+                        <Plus size={12} strokeWidth={2.5} />
+                        <span>Visita</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Slot Content Area */}
-                  <div style={{ flex: 1, padding: '0.35rem 0.6rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', justifyContent: 'center' }}>
+                  <div style={{ flex: 1, padding: '0.4rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', justifyContent: 'center' }}>
                     {isOccupied ? (
-                      slotAppointments.map((apt) => {
-                        const pet = apt.animaleId;
-                        const owner = apt.proprietarioId || pet?.proprietarioId;
-                        const styleConfig = STATUS_COLORS[apt.stato] || STATUS_COLORS['Prenotato'];
+                      <>
+                        {slotAppointments.length > 1 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.1rem' }}>
+                            <span
+                              style={{
+                                fontSize: '0.72rem',
+                                fontWeight: '800',
+                                color: '#0369a1',
+                                backgroundColor: '#e0f2fe',
+                                padding: '0.15rem 0.55rem',
+                                borderRadius: 'var(--radius-full)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem'
+                              }}
+                            >
+                              <span>⚡</span> {slotAppointments.length} visite parallele alle {slot}
+                            </span>
+                          </div>
+                        )}
 
-                        return (
-                          <div
-                            key={apt._id}
-                            style={{
-                              display: 'flex',
-                              flexWrap: 'wrap',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              gap: '0.75rem',
-                              padding: '0.5rem 0.75rem',
-                              borderRadius: 'var(--radius-sm)',
-                              backgroundColor: styleConfig.bg,
-                              borderLeft: `4px solid ${styleConfig.border}`
-                            }}
-                          >
-                            {/* Pet & Owner Details */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '220px' }}>
-                              <div
-                                onClick={() => pet && onSelectPet && onSelectPet(pet)}
-                                style={{
-                                  cursor: pet ? 'pointer' : 'default',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.4rem'
-                                }}
-                              >
-                                <span style={{ fontWeight: '800', color: 'var(--slate-900)', fontSize: '0.95rem' }}>
-                                  {pet?.nome || 'Paziente'}
-                                </span>
-                                {pet?.specie && (
-                                  <span style={{ fontSize: '0.75rem', color: 'var(--slate-500)' }}>
-                                    ({pet.specie} {pet.razza ? `• ${pet.razza}` : ''})
+                        {slotAppointments.map((apt) => {
+                          const pet = apt.animaleId;
+                          const owner = apt.proprietarioId || pet?.proprietarioId;
+                          const styleConfig = STATUS_COLORS[apt.stato] || STATUS_COLORS['Prenotato'];
+
+                          const vetObj = apt.veterinarioId || apt.visitaId?.veterinarioId;
+                          const vetName = vetObj
+                            ? (typeof vetObj === 'object' ? `${vetObj.nome || ''} ${vetObj.cognome || ''}`.trim() : vetObj)
+                            : null;
+
+                          return (
+                            <div
+                              key={apt._id}
+                              style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '0.75rem',
+                                padding: '0.5rem 0.75rem',
+                                borderRadius: 'var(--radius-sm)',
+                                backgroundColor: styleConfig.bg,
+                                borderLeft: `4px solid ${styleConfig.border}`
+                              }}
+                            >
+                              {/* Pet & Owner Details */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '220px' }}>
+                                <div
+                                  onClick={() => pet && onSelectPet && onSelectPet(pet)}
+                                  style={{
+                                    cursor: pet ? 'pointer' : 'default',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem'
+                                  }}
+                                >
+                                  <span style={{ fontWeight: '800', color: 'var(--slate-900)', fontSize: '0.95rem' }}>
+                                    {pet?.nome || 'Paziente'}
                                   </span>
+                                  {pet?.specie && (
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--slate-500)' }}>
+                                      ({pet.specie} {pet.razza ? `• ${pet.razza}` : ''})
+                                    </span>
+                                  )}
+                                </div>
+
+                                {owner && (
+                                  <div style={{ fontSize: '0.78rem', color: 'var(--slate-600)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                    <User size={13} />
+                                    <span>{owner.cognome || owner.nome}</span>
+                                    {owner.telefono && <span style={{ color: 'var(--slate-400)' }}>({owner.telefono})</span>}
+                                  </div>
                                 )}
                               </div>
 
-                              {owner && (
-                                <div style={{ fontSize: '0.78rem', color: 'var(--slate-600)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <User size={13} />
-                                  <span>{owner.cognome || owner.nome}</span>
-                                  {owner.telefono && <span style={{ color: 'var(--slate-400)' }}>({owner.telefono})</span>}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Procedure & Duration */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                              <span
-                                style={{
-                                  fontSize: '0.8rem',
-                                  fontWeight: '600',
-                                  backgroundColor: '#ffffff',
-                                  padding: '0.2rem 0.5rem',
-                                  borderRadius: 'var(--radius-sm)',
-                                  border: '1px solid var(--border-color)',
-                                  color: 'var(--slate-700)'
-                                }}
-                              >
-                                {apt.motivo}
-                              </span>
-                              {apt.visitaId && (
+                              {/* Procedure, Veterinarian & Duration */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                                 <span
                                   style={{
-                                    fontSize: '0.7rem',
-                                    fontWeight: '700',
-                                    padding: '0.15rem 0.5rem',
-                                    borderRadius: 'var(--radius-full)',
-                                    backgroundColor: 'var(--primary-50)',
-                                    color: 'var(--primary)',
-                                    border: '1px solid rgba(13, 148, 136, 0.25)',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.25rem'
+                                    fontSize: '0.8rem',
+                                    fontWeight: '600',
+                                    backgroundColor: '#ffffff',
+                                    padding: '0.2rem 0.5rem',
+                                    borderRadius: 'var(--radius-sm)',
+                                    border: '1px solid var(--border-color)',
+                                    color: 'var(--slate-700)'
                                   }}
-                                  title="Registrata da Cartella Clinica"
                                 >
-                                  <Stethoscope size={11} strokeWidth={2.5} />
-                                  <span>Visita Clinica</span>
+                                  {apt.motivo}
                                 </span>
-                              )}
-                              <span style={{ fontSize: '0.75rem', color: 'var(--slate-500)' }}>
-                                {apt.durataMinuti || 30} min
-                              </span>
-                            </div>
 
-                            {/* Status and Action Buttons */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              {/* Quick Status Selector */}
-                              <select
-                                className="form-select"
-                                style={{
-                                  padding: '0.2rem 0.5rem',
-                                  fontSize: '0.75rem',
-                                  fontWeight: '700',
-                                  borderRadius: 'var(--radius-sm)',
-                                  color: styleConfig.color,
-                                  borderColor: styleConfig.border,
-                                  backgroundColor: '#ffffff',
-                                  width: 'auto'
-                                }}
-                                value={apt.stato}
-                                onChange={(e) => handleStatusChange(apt._id, e.target.value)}
-                              >
-                                <option value="Prenotato">📅 Prenotato</option>
-                                <option value="Confermato">👍 Confermato</option>
-                                <option value="In Attesa">⏳ In Attesa</option>
-                                <option value="In Visita">🩺 In Visita</option>
-                                <option value="Completato">✅ Completato</option>
-                                <option value="Annullato">❌ Annullato</option>
-                              </select>
+                                {vetName && (
+                                  <span
+                                    style={{
+                                      fontSize: '0.74rem',
+                                      fontWeight: '700',
+                                      padding: '0.15rem 0.5rem',
+                                      borderRadius: 'var(--radius-sm)',
+                                      backgroundColor: '#f0fdfa',
+                                      color: '#0f766e',
+                                      border: '1px solid rgba(13, 148, 136, 0.25)',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.3rem'
+                                    }}
+                                    title="Veterinario assegnato alla visita"
+                                  >
+                                    <Stethoscope size={12} strokeWidth={2.5} />
+                                    <span>Dott. {vetName}</span>
+                                  </span>
+                                )}
 
-                              {/* Edit / Delete */}
-                              <button
-                                className="btn btn-icon btn-secondary"
-                                style={{ width: '28px', height: '28px', padding: 0 }}
-                                onClick={() => onEditAppointment(apt)}
-                                title="Modifica Appuntamento"
-                              >
-                                <Edit3 size={14} />
-                              </button>
-                              <button
-                                className="btn btn-icon btn-secondary"
-                                style={{ width: '28px', height: '28px', padding: 0, color: 'var(--rose-500)' }}
-                                onClick={() => handleDelete(apt._id)}
-                                title="Elimina Appuntamento"
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                                {apt.visitaId && (
+                                  <span
+                                    style={{
+                                      fontSize: '0.7rem',
+                                      fontWeight: '700',
+                                      padding: '0.15rem 0.5rem',
+                                      borderRadius: 'var(--radius-full)',
+                                      backgroundColor: 'var(--primary-50)',
+                                      color: 'var(--primary)',
+                                      border: '1px solid rgba(13, 148, 136, 0.25)',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.25rem'
+                                    }}
+                                    title="Registrata da Cartella Clinica"
+                                  >
+                                    <Stethoscope size={11} strokeWidth={2.5} />
+                                    <span>Cartella Clinica</span>
+                                  </span>
+                                )}
+
+                                <span style={{ fontSize: '0.75rem', color: 'var(--slate-500)' }}>
+                                  {apt.durataMinuti || 30} min
+                                </span>
+                              </div>
+
+                              {/* Status and Action Buttons */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                {/* Quick Status Selector */}
+                                <select
+                                  className="form-select"
+                                  style={{
+                                    padding: '0.2rem 0.5rem',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '700',
+                                    borderRadius: 'var(--radius-sm)',
+                                    color: styleConfig.color,
+                                    borderColor: styleConfig.border,
+                                    backgroundColor: '#ffffff',
+                                    width: 'auto'
+                                  }}
+                                  value={apt.stato}
+                                  onChange={(e) => handleStatusChange(apt._id, e.target.value)}
+                                >
+                                  <option value="Prenotato">📅 Prenotato</option>
+                                  <option value="Confermato">👍 Confermato</option>
+                                  <option value="In Attesa">⏳ In Attesa</option>
+                                  <option value="In Visita">🩺 In Visita</option>
+                                  <option value="Completato">✅ Completato</option>
+                                  <option value="Annullato">❌ Annullato</option>
+                                </select>
+
+                                {/* Stampa Referto Clinico (se visita presente) */}
+                                {apt.visitaId && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-icon btn-secondary"
+                                    style={{ width: '28px', height: '28px', padding: 0, color: 'var(--primary)' }}
+                                    onClick={() => setReportVisitId(typeof apt.visitaId === 'object' ? apt.visitaId._id : apt.visitaId)}
+                                    title="Stampa Referto Visita Clinica"
+                                  >
+                                    <Printer size={14} />
+                                  </button>
+                                )}
+
+                                {/* Edit / Delete */}
+                                <button
+                                  className="btn btn-icon btn-secondary"
+                                  style={{ width: '28px', height: '28px', padding: 0 }}
+                                  onClick={() => onEditAppointment(apt)}
+                                  title="Modifica Appuntamento"
+                                >
+                                  <Edit3 size={14} />
+                                </button>
+                                <button
+                                  className="btn btn-icon btn-secondary"
+                                  style={{ width: '28px', height: '28px', padding: 0, color: 'var(--rose-500)' }}
+                                  onClick={() => handleDelete(apt._id)}
+                                  title="Elimina Appuntamento"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })
+                          );
+                        })}
+
+                        {/* Pulsante rapido per aggiungere un'altra visita nello stesso orario */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-start', paddingTop: '0.1rem' }}>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => onNewAppointment({ date: selectedDate, time: slot })}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              fontSize: '0.75rem',
+                              padding: '0.25rem 0.65rem',
+                              borderRadius: 'var(--radius-sm)',
+                              border: '1px dashed var(--primary)',
+                              color: 'var(--primary)',
+                              backgroundColor: '#ffffff'
+                            }}
+                            title={`Aggiungi un'ulteriore visita in parallelo alle ore ${slot}`}
+                          >
+                            <Plus size={13} strokeWidth={2.5} />
+                            <span>Aggiungi un'altra visita alle {slot}</span>
+                          </button>
+                        </div>
+                      </>
                     ) : (
                       /* Empty Slot - Click to Book */
                       <div
@@ -691,6 +802,13 @@ export const AgendaPage = ({
           </div>
         )}
       </div>
+
+      {/* Modale Referto Ufficiale & Stampa PDF */}
+      <VisitReportModal
+        isOpen={Boolean(reportVisitId)}
+        onClose={() => setReportVisitId(null)}
+        visitId={reportVisitId}
+      />
     </div>
   );
 };

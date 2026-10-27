@@ -14,6 +14,7 @@ import { TherapiesPage } from './pages/TherapiesPage';
 import { OwnersPage } from './pages/OwnersPage';
 import { ClinicsPage } from './pages/ClinicsPage';
 import { AgendaPage } from './pages/AgendaPage';
+import { ProfilePage } from './pages/ProfilePage';
 
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
@@ -244,7 +245,7 @@ const MainLayout = () => {
       {/* Main Column */}
       <div className="main-wrapper">
         {/* Top Navbar */}
-        <Navbar onOpenNewClinic={handleOpenNewClinic} />
+        <Navbar onOpenNewClinic={handleOpenNewClinic} onNavigateTab={setCurrentTab} />
 
         {/* Page Content Rendering */}
         <main>
@@ -321,6 +322,10 @@ const MainLayout = () => {
             />
           )}
 
+          {currentTab === 'profile' && (
+            <ProfilePage />
+          )}
+
           {currentTab === 'error-404' && (
             <ErrorPage
               code="404"
@@ -369,6 +374,7 @@ const MainLayout = () => {
             'therapies',
             'owners',
             'clinics',
+            'profile',
             'error-404',
             'error-403',
             'error-500',

@@ -11,7 +11,8 @@ import {
   Stethoscope,
   MapPin,
   Phone,
-  ShieldAlert
+  ShieldAlert,
+  User
 } from 'lucide-react';
 import { useClinic } from '../../context/ClinicContext';
 
@@ -25,7 +26,8 @@ export const Sidebar = ({ currentTab, onTabChange, onNewVisit, onNewPet }) => {
     { id: 'visits', label: 'Visite Cliniche', icon: ClipboardList },
     { id: 'therapies', label: 'Terapie & Farmaci', icon: Pill },
     { id: 'owners', label: 'Anagrafica Clienti', icon: Users },
-    { id: 'clinics', label: 'I Miei Ambulatori', icon: Building2 }
+    { id: 'clinics', label: 'I Miei Ambulatori', icon: Building2 },
+    { id: 'profile', label: 'Il Mio Profilo', icon: User }
   ];
 
   return (

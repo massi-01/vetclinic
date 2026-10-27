@@ -1650,3 +1650,252 @@ a {
   max-height: 160px;
 }
 
+/* ==========================================================
+   REFERTO VISITA CLINICA & STAMPA UFFICIALE (@media print)
+   ========================================================== */
+.visit-report-sheet {
+  background: #ffffff;
+  color: #1e293b;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 2.25rem 2.5rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--slate-200);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+.report-clinic-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 2px solid var(--primary);
+  margin-bottom: 1.25rem;
+}
+
+.report-title-banner {
+  background: linear-gradient(135deg, var(--slate-900) 0%, #1e293b 100%);
+  color: #ffffff;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.report-grid-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .report-grid-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.report-box {
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1.1rem;
+}
+
+.report-box-title {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--primary);
+  margin-bottom: 0.65rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--slate-200);
+  padding-bottom: 0.35rem;
+}
+
+.report-info-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+  font-size: 0.84rem;
+}
+
+.report-info-label {
+  color: var(--slate-500);
+  font-weight: 500;
+}
+
+.report-info-value {
+  color: var(--slate-900);
+  font-weight: 700;
+  text-align: right;
+}
+
+.report-vitals-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .report-vitals-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.report-vital-card {
+  background: #ffffff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.5rem;
+  text-align: center;
+}
+
+.report-section {
+  margin-bottom: 1.15rem;
+  break-inside: avoid;
+}
+
+.report-section-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--slate-800);
+  margin-bottom: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.report-text-block {
+  background: #ffffff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.95rem;
+  color: var(--slate-800);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.report-therapy-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  margin-top: 0.4rem;
+  background: #ffffff;
+}
+
+.report-therapy-table th {
+  background: var(--slate-100);
+  color: var(--slate-700);
+  font-weight: 700;
+  text-align: left;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--slate-200);
+  text-transform: uppercase;
+  font-size: 0.72rem;
+}
+
+.report-therapy-table td {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--slate-200);
+  color: var(--slate-800);
+  vertical-align: top;
+}
+
+.report-signature-block {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--slate-200);
+  break-inside: avoid;
+}
+
+/* Regole per la stampa ad alta risoluzione A4 */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11pt !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Nascondi tutti i componenti applicativi */
+  .navbar,
+  .sidebar,
+  .bottom-nav,
+  .fab,
+  .toast-container,
+  .modal-header,
+  .no-print,
+  button:not(.print-include) {
+    display: none !important;
+  }
+
+  .modal-overlay {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  .modal-content {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    background: transparent !important;
+  }
+
+  .visit-report-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .report-box {
+    background: #f8fafc !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .report-title-banner {
+    background: #0f172a !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .report-section,
+  .report-box,
+  .report-signature-block {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+

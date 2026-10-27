@@ -4,6 +4,7 @@ import { useClinic } from '../context/ClinicContext';
 import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
 import { VisitCard } from '../components/visits/VisitCard';
+import { VisitReportModal } from '../components/visits/VisitReportModal';
 import { SkeletonGrid } from '../components/common/SkeletonLoaders';
 
 export const VisitsPage = ({ onSelectPet, onNewVisit, onEditVisit, refreshTrigger }) => {
@@ -12,6 +13,7 @@ export const VisitsPage = ({ onSelectPet, onNewVisit, onEditVisit, refreshTrigge
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState('');
+  const [reportVisit, setReportVisit] = useState(null);
 
   const loadVisits = async () => {
     try {
@@ -143,10 +145,18 @@ export const VisitsPage = ({ onSelectPet, onNewVisit, onEditVisit, refreshTrigge
               onSelectPet={onSelectPet}
               onEdit={onEditVisit}
               onDelete={handleDelete}
+              onPrint={(v) => setReportVisit(v)}
             />
           ))}
         </div>
       )}
+
+      {/* Modale Referto Ufficiale & Stampa PDF */}
+      <VisitReportModal
+        isOpen={Boolean(reportVisit)}
+        onClose={() => setReportVisit(null)}
+        visit={reportVisit}
+      />
     </div>
   );
 };

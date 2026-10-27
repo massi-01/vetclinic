@@ -3,7 +3,7 @@ import { Stethoscope, LogOut, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ClinicSwitcher } from './ClinicSwitcher';
 
-export const Navbar = ({ onOpenNewClinic }) => {
+export const Navbar = ({ onOpenNewClinic, onNavigateTab }) => {
   const { user, logout } = useAuth();
 
   return (
@@ -23,8 +23,11 @@ export const Navbar = ({ onOpenNewClinic }) => {
 
         <div className="topbar-user">
           <div
+            id="topbar-btn-profile"
             className="topbar-user-profile"
-            title={`Dott. ${user?.nome} ${user?.cognome} (Albo: ${user?.codiceAlbo || 'N/D'})`}
+            title={`Dott. ${user?.nome} ${user?.cognome} - Clicca per visualizzare o modificare il profilo`}
+            onClick={() => onNavigateTab && onNavigateTab('profile')}
+            style={{ cursor: 'pointer', transition: 'all var(--transition-fast)' }}
           >
             {user?.avatarUrl ? (
               <img

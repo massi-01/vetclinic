@@ -40,10 +40,40 @@ export const swaggerDocument = {
           nome: { type: 'string', example: 'Marco' },
           cognome: { type: 'string', example: 'Rossi' },
           email: { type: 'string', example: 'dr.rossi@vetclinic.it' },
-          password: { type: 'string', example: 'Password123!' },
+          password: {
+            type: 'string',
+            minLength: 8,
+            description: 'Password sicura (minimo 8 caratteri, almeno una maiuscola, un numero e un carattere speciale)',
+            example: 'Password123!'
+          },
           telefono: { type: 'string', example: '+39 347 1234567' },
           codiceAlbo: { type: 'string', example: 'MI-8492' },
           ambulatorioNome: { type: 'string', example: 'Clinica San Francesco' }
+        }
+      },
+      UserProfileUpdate: {
+        type: 'object',
+        required: ['nome', 'cognome', 'email'],
+        properties: {
+          nome: { type: 'string', example: 'Marco' },
+          cognome: { type: 'string', example: 'Rossi' },
+          email: { type: 'string', example: 'dr.rossi@vetclinic.it' },
+          telefono: { type: 'string', example: '+39 347 1234567' },
+          codiceAlbo: { type: 'string', example: 'MI-8492' },
+          avatarUrl: { type: 'string', example: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=256' }
+        }
+      },
+      UserChangePassword: {
+        type: 'object',
+        required: ['currentPassword', 'newPassword'],
+        properties: {
+          currentPassword: { type: 'string', example: 'Password123!' },
+          newPassword: {
+            type: 'string',
+            minLength: 8,
+            description: 'Nuova password conforme ai requisiti di sicurezza',
+            example: 'NuovaPassword2026!'
+          }
         }
       },
       Clinic: {
@@ -220,6 +250,38 @@ export const swaggerDocument = {
         responses: {
           200: { description: 'Dati profilo utente' },
           401: { description: 'Token mancante o non valido' }
+        }
+      }
+    },
+    '/api/auth/profile': {
+      put: {
+        tags: ['Autenticazione'],
+        summary: 'Aggiorna i dettagli anagrafici e professionali del profilo utente autenticato',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/UserProfileUpdate' } } }
+        },
+        responses: {
+          200: { description: 'Profilo aggiornato con successo' },
+          400: { description: 'Dati mancanti o email già utilizzata' },
+          401: { description: 'Non autenticato' }
+        }
+      }
+    },
+    '/api/auth/change-password': {
+      put: {
+        tags: ['Autenticazione'],
+        summary: 'Modifica la password di accesso con verifica della password attuale e vincoli di complessità',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/UserChangePassword' } } }
+        },
+        responses: {
+          200: { description: 'Password aggiornata con successo' },
+          400: { description: 'Password attuale errata o nuova password non conforme' },
+          401: { description: 'Non autenticato' }
         }
       }
     },

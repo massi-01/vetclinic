@@ -7,6 +7,8 @@ import Visit from './src/models/Visit.js';
 import Vaccination from './src/models/Vaccination.js';
 import Therapy from './src/models/Therapy.js';
 import { dataStore, initSeedData } from './src/services/dataStore.js';
+import { validatePasswordSecurity } from './src/utils/passwordValidator.js';
+import { register, login, updateProfile, changePassword } from './src/controllers/authController.js';
 
 async function runTests() {
   console.log('🧪 Avvio suite di test di verifica P1...\n');
@@ -50,38 +52,39 @@ async function runTests() {
   assert.strictEqual(auth2, false, 'Utente NON deve essere autorizzato per clinic2');
   console.log('   ✅ Accesso incrociato correttamente negato (isUserAuthorizedForClinic = false).\n');
 
-  // Test 3: Verifica prevenzione Overbooking Appuntamenti
-  console.log('3. Verifica prevenzione Overbooking / Conflitti orari appuntamenti...');
+  // Test 3: Verifica supporto visite e appuntamenti paralleli nello stesso slot orario
+  console.log('3. Verifica supporto visite parallele / slot orario multiplo...');
   const testDate = '2026-11-20';
   const newApp1 = await dataStore.createAppointment({
     data: testDate,
     oraInizio: '14:00',
     oraFine: '14:30',
-    motivo: 'Visita 1',
+    motivo: 'Visita 1 - Controllo Generale',
     animaleId: 'pet-123',
     proprietarioId: 'owner-123',
+    veterinarioId: fakeVet._id,
     ambulatorioId: clinic1._id
   });
   assert(newApp1._id, 'Primo appuntamento creato');
 
-  let conflictCaught = false;
-  try {
-    await dataStore.createAppointment({
-      data: testDate,
-      oraInizio: '14:00',
-      oraFine: '14:30',
-      motivo: 'Visita sovrapposta (conflitto)',
-      animaleId: 'pet-456',
-      proprietarioId: 'owner-456',
-      ambulatorioId: clinic1._id
-    });
-  } catch (err) {
-    if (err.message.includes('CONFLITTO_ORARIO')) {
-      conflictCaught = true;
-    }
-  }
-  assert.strictEqual(conflictCaught, true, 'La creazione di un secondo appuntamento nello stesso slot deve generare CONFLITTO_ORARIO');
-  console.log('   ✅ Overbooking intercettato e bloccato correttamente (CONFLITTO_ORARIO).\n');
+  const newApp2 = await dataStore.createAppointment({
+    data: testDate,
+    oraInizio: '14:00',
+    oraFine: '14:30',
+    motivo: 'Visita 2 parallela nello stesso orario',
+    animaleId: 'pet-456',
+    proprietarioId: 'owner-456',
+    veterinarioId: fakeVet._id,
+    ambulatorioId: clinic1._id
+  });
+  assert(newApp2._id, 'Secondo appuntamento parallelo creato con successo');
+
+  const parallelApps = await dataStore.getAppointments(clinic1._id, { data: testDate });
+  const slotApps = parallelApps.filter(a => a.oraInizio === '14:00');
+  assert(slotApps.length >= 2, 'Lo slot deve contenere almeno 2 visite in contemporanea');
+  assert(slotApps.some(a => a.motivo === 'Visita 1 - Controllo Generale'), 'Visita 1 presente');
+  assert(slotApps.some(a => a.motivo === 'Visita 2 parallela nello stesso orario'), 'Visita 2 presente');
+  console.log('   ✅ Visite parallele nello stesso slot orario supportate e salvate con successo.\n');
 
   // Test 4: Verifica integrità referenziale cancellazione Proprietario con animali
   console.log('4. Verifica integrità referenziale cancellazione Proprietario...');
@@ -188,7 +191,169 @@ async function runTests() {
   const appsAfterDelete = await dataStore.getAppointments(clinic1._id, { data: visitSyncDate });
   const deletedMatchedApp = appsAfterDelete.find(a => (a.visitaId?._id || a.visitaId)?.toString() === newVisitSync._id.toString());
   assert.strictEqual(deletedMatchedApp, undefined, 'L\'appuntamento deve essere rimosso dal calendario quando la visita viene eliminata');
-  console.log('   ✅ Sincronizzazione automatica Visita -> Calendario perfettamente funzionante (creazione, visualizzazione, modifica, eliminazione).\n');
+  // Test 8: Verifica tracciamento Audit Log Medico-Legale
+  console.log('8. Verifica tracciamento Audit Log Medico-Legale...');
+  const auditLogs = await dataStore.getAuditLogs({ ambulatorioId: clinic1._id });
+  assert(auditLogs.length > 0, 'Il registro audit deve contenere le azioni registrate');
+  const appointmentLogs = auditLogs.filter(l => l.entita === 'Appointment');
+  assert(appointmentLogs.length > 0, 'Devono essere presenti audit log per gli appuntamenti');
+  assert(appointmentLogs.some(l => l.azione === 'CREATE'), 'Audit log CREATE presente');
+  console.log(`   ✅ Registro audit medico-legale verificato con successo (${auditLogs.length} eventi tracciati).\n`);
+
+  // Test 9: Verifica Sicurezza Password in Registrazione
+  console.log('9. Verifica policy di sicurezza password (lunghezza min, maiuscole, speciali)...');
+  
+  // Caso 1: Troppo corta (< 8)
+  const shortRes = validatePasswordSecurity('Ab1!');
+  assert.strictEqual(shortRes.isValid, false, 'Password corta deve fallire');
+  assert(shortRes.errors.some(e => e.includes('almeno 8 caratteri')), 'Errore lunghezza minima atteso');
+
+  // Caso 2: Senza maiuscola
+  const noUpperRes = validatePasswordSecurity('password123!');
+  assert.strictEqual(noUpperRes.isValid, false, 'Password senza maiuscola deve fallire');
+  assert(noUpperRes.errors.some(e => e.includes('lettera maiuscola')), 'Errore maiuscola atteso');
+
+  // Caso 3: Senza minuscola
+  const noLowerRes = validatePasswordSecurity('PASSWORD123!');
+  assert.strictEqual(noLowerRes.isValid, false, 'Password senza minuscola deve fallire');
+  assert(noLowerRes.errors.some(e => e.includes('lettera minuscola')), 'Errore minuscola atteso');
+
+  // Caso 4: Senza numero
+  const noNumRes = validatePasswordSecurity('Password!');
+  assert.strictEqual(noNumRes.isValid, false, 'Password senza numero deve fallire');
+  assert(noNumRes.errors.some(e => e.includes('numero')), 'Errore numero atteso');
+
+  // Caso 5: Senza caratteri speciali
+  const noSpecialRes = validatePasswordSecurity('Password123');
+  assert.strictEqual(noSpecialRes.isValid, false, 'Password senza carattere speciale deve fallire');
+  assert(noSpecialRes.errors.some(e => e.includes('carattere speciale')), 'Errore speciale atteso');
+
+  // Caso 6: Password valida (conferma validità Password123!)
+  const validRes = validatePasswordSecurity('Password123!');
+  assert.strictEqual(validRes.isValid, true, 'Password123! deve superare tutti i criteri');
+  assert.strictEqual(validRes.errors.length, 0, 'Nessun errore atteso per password valida');
+
+  // Caso 7: Test controller register con mock req/res
+  let mockStatusCode = 0;
+  let mockJsonData = null;
+  const mockRes = {
+    status(code) {
+      mockStatusCode = code;
+      return this;
+    },
+    json(data) {
+      if (!mockStatusCode) mockStatusCode = 200;
+      mockJsonData = data;
+      return this;
+    }
+  };
+
+  // Chiamata con password debole (manca speciale)
+  await register({
+    body: {
+      nome: 'Giulia',
+      cognome: 'Bianchi',
+      email: 'giulia.weak@test.it',
+      password: 'Password123'
+    }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 400, 'Registrazione con password debole deve restituire 400');
+  assert.strictEqual(mockJsonData.success, false);
+  assert(mockJsonData.message.includes('carattere speciale'), 'Il messaggio deve segnalare la mancanza di carattere speciale');
+
+  // Chiamata con password sicura valida
+  await register({
+    body: {
+      nome: 'Giulia',
+      cognome: 'Bianchi',
+      email: 'giulia.secure@test.it',
+      password: 'SecurePassword2026!'
+    }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 201, 'Registrazione con password conforme deve restituire 201');
+  assert.strictEqual(mockJsonData.success, true);
+  assert(mockJsonData.token, 'Token JWT deve essere generato');
+  assert.strictEqual(mockJsonData.user.email, 'giulia.secure@test.it');
+
+  console.log('   ✅ Validazione password e policy di registrazione verificate con successo (7/7 scenari).\n');
+
+  // Test 10: Modifica Dettagli Profilo e Cambio Password
+  console.log('10. Verifica modifica dettagli profilo e cambio password...');
+  const userToUpdate = mockJsonData.user;
+  
+  // Test updateProfile
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await updateProfile({
+    user: userToUpdate,
+    body: {
+      nome: 'Giulia Maria',
+      cognome: 'Bianchi Rossi',
+      email: 'giulia.updated@test.it',
+      telefono: '+39 349 9988776',
+      codiceAlbo: 'TO-9999',
+      avatarUrl: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2'
+    }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 200, 'Aggiornamento profilo deve restituire 200');
+  assert.strictEqual(mockJsonData.success, true);
+  assert.strictEqual(mockJsonData.user.nome, 'Giulia Maria');
+  assert.strictEqual(mockJsonData.user.email, 'giulia.updated@test.it');
+  assert.strictEqual(mockJsonData.user.codiceAlbo, 'TO-9999');
+  assert.strictEqual(mockJsonData.user.avatarUrl, 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2');
+
+  // Test changePassword: con password attuale errata
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await changePassword({
+    user: { _id: userToUpdate._id },
+    body: {
+      currentPassword: 'WrongPassword1!',
+      newPassword: 'BrandNewPassword2026!'
+    }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 400);
+  assert(mockJsonData.message.includes('non è corretta'));
+
+  // Test changePassword: con nuova password debole
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await changePassword({
+    user: { _id: userToUpdate._id },
+    body: {
+      currentPassword: 'SecurePassword2026!',
+      newPassword: 'short'
+    }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 400);
+  assert(mockJsonData.message.includes('almeno 8 caratteri'));
+
+  // Test changePassword: con nuova password valida
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await changePassword({
+    user: { _id: userToUpdate._id },
+    body: {
+      currentPassword: 'SecurePassword2026!',
+      newPassword: 'SuperNewPassword2026!'
+    }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 200);
+  assert.strictEqual(mockJsonData.success, true);
+
+  // Verifica che il login funzioni con la nuova password
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await login({
+    body: {
+      email: 'giulia.updated@test.it',
+      password: 'SuperNewPassword2026!'
+    }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 200);
+  assert.strictEqual(mockJsonData.success, true);
+  assert(mockJsonData.token, 'Token generato al login con nuova password');
+  console.log('   ✅ Modifica anagrafica profilo e aggiornamento sicuro password verificati con successo.\n');
 
   console.log('🎉 TUTTI I TEST P1 SONO STATI SUPERATI CON SUCCESSO!');
 }
@@ -197,3 +362,4 @@ runTests().catch(err => {
   console.error('❌ Errore durante i test:', err);
   process.exit(1);
 });
+

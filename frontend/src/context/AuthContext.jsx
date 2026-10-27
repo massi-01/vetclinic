@@ -55,6 +55,24 @@ export const AuthProvider = ({ children }) => {
     throw new Error(res.message || 'Errore nella registrazione');
   };
 
+  const updateProfile = async (userData) => {
+    const res = await api.auth.updateProfile(userData);
+    if (res.success && res.user) {
+      localStorage.setItem('vet_user', JSON.stringify(res.user));
+      setUser(res.user);
+      return res.user;
+    }
+    throw new Error(res.message || "Errore durante l'aggiornamento del profilo");
+  };
+
+  const changePassword = async ({ currentPassword, newPassword }) => {
+    const res = await api.auth.changePassword({ currentPassword, newPassword });
+    if (res.success) {
+      return res;
+    }
+    throw new Error(res.message || 'Errore durante la modifica della password');
+  };
+
   const logout = () => {
     localStorage.removeItem('vet_token');
     localStorage.removeItem('vet_user');
@@ -64,7 +82,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateProfile, changePassword }}>
       {children}
     </AuthContext.Provider>
   );

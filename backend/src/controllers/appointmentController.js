@@ -1,4 +1,5 @@
 import { dataStore } from '../services/dataStore.js';
+import { logger } from '../utils/logger.js';
 
 export const getAppointments = async (req, res) => {
   try {
@@ -9,6 +10,7 @@ export const getAppointments = async (req, res) => {
       data: appointments
     });
   } catch (error) {
+    logger.error('Errore nel recupero degli appuntamenti', error);
     res.status(500).json({
       success: false,
       message: 'Errore nel recupero degli appuntamenti',
@@ -41,6 +43,7 @@ export const getAppointmentById = async (req, res) => {
       data: app
     });
   } catch (error) {
+    logger.error("Errore nel recupero dell'appuntamento", error);
     res.status(500).json({
       success: false,
       message: "Errore nel recupero dell'appuntamento",
@@ -62,6 +65,7 @@ export const createAppointment = async (req, res) => {
       note,
       animaleId,
       proprietarioId,
+      veterinarioId,
       ambulatorioId
     } = req.body;
 
@@ -91,6 +95,8 @@ export const createAppointment = async (req, res) => {
       calculatedFine = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
     }
 
+    const assignedVetId = veterinarioId || req.user._id;
+
     const app = await dataStore.createAppointment({
       data,
       oraInizio,
@@ -102,7 +108,7 @@ export const createAppointment = async (req, res) => {
       note: note || '',
       animaleId,
       proprietarioId,
-      veterinarioId: req.user._id,
+      veterinarioId: assignedVetId,
       ambulatorioId
     });
 
@@ -111,12 +117,7 @@ export const createAppointment = async (req, res) => {
       data: app
     });
   } catch (error) {
-    if (error.message && error.message.includes('CONFLITTO_ORARIO')) {
-      return res.status(409).json({
-        success: false,
-        message: error.message.replace('CONFLITTO_ORARIO: ', '')
-      });
-    }
+    logger.error("Errore durante la creazione dell'appuntamento", error);
     res.status(500).json({
       success: false,
       message: 'Errore durante la creazione dell\'appuntamento',
@@ -150,12 +151,7 @@ export const updateAppointment = async (req, res) => {
       data: app
     });
   } catch (error) {
-    if (error.message && error.message.includes('CONFLITTO_ORARIO')) {
-      return res.status(409).json({
-        success: false,
-        message: error.message.replace('CONFLITTO_ORARIO: ', '')
-      });
-    }
+    logger.error("Errore durante l'aggiornamento dell'appuntamento", error);
     res.status(500).json({
       success: false,
       message: "Errore durante l'aggiornamento dell'appuntamento",

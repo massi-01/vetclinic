@@ -56,7 +56,9 @@ export const api = {
   auth: {
     login: (credentials) => request('/auth/login', { method: 'POST', body: credentials }),
     register: (userData) => request('/auth/register', { method: 'POST', body: userData }),
-    getMe: () => request('/auth/me')
+    getMe: () => request('/auth/me'),
+    updateProfile: (userData) => request('/auth/profile', { method: 'PUT', body: userData }),
+    changePassword: (passwords) => request('/auth/change-password', { method: 'PUT', body: passwords })
   },
   clinics: {
     getAll: () => request('/clinics'),
@@ -133,6 +135,12 @@ export const api = {
     getDashboard: (clinicId) => {
       const qs = clinicId ? `?clinicId=${clinicId}` : '';
       return request(`/stats/dashboard${qs}`);
+    }
+  },
+  auditLogs: {
+    getAll: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/audit-logs${qs ? `?${qs}` : ''}`);
     }
   }
 };

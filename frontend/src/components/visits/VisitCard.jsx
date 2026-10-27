@@ -1,7 +1,7 @@
 import React from 'react';
-import { Calendar, Clock, Stethoscope, HeartPulse, User, Pill, Edit2, Trash2 } from 'lucide-react';
+import { Calendar, Clock, Stethoscope, HeartPulse, User, Pill, Edit2, Trash2, Printer } from 'lucide-react';
 
-export const VisitCard = ({ visit, onSelectPet, onEdit, onDelete }) => {
+export const VisitCard = ({ visit, onSelectPet, onEdit, onDelete, onPrint }) => {
   const pet = visit.animaleId;
   const vet = visit.veterinarioId;
 
@@ -36,6 +36,16 @@ export const VisitCard = ({ visit, onSelectPet, onEdit, onDelete }) => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.35rem' }}>
+          {onPrint && (
+            <button
+              className="btn btn-sm btn-secondary btn-icon"
+              title="Stampa Referto Clinico / Salva in PDF"
+              onClick={() => onPrint(visit)}
+              style={{ color: 'var(--primary)' }}
+            >
+              <Printer size={13} />
+            </button>
+          )}
           {onEdit && (
             <button
               className="btn btn-sm btn-secondary btn-icon"
@@ -95,7 +105,29 @@ export const VisitCard = ({ visit, onSelectPet, onEdit, onDelete }) => {
         <div>
           {vet && <span>Dott. {vet.nome} {vet.cognome}</span>}
         </div>
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {onPrint && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => onPrint(visit)}
+              style={{
+                fontSize: '0.72rem',
+                padding: '2px 8px',
+                background: 'var(--primary-subtle)',
+                color: 'var(--primary)',
+                border: '1px solid var(--primary-light)',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontWeight: '700'
+              }}
+            >
+              <Printer size={11} /> Referto PDF
+            </button>
+          )}
           {visit.ambulatorioId?.nome && <span>{visit.ambulatorioId.nome}</span>}
         </div>
       </div>

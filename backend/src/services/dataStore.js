@@ -9,7 +9,9 @@ import Therapy from '../models/Therapy.js';
 import Vaccination from '../models/Vaccination.js';
 import Appointment from '../models/Appointment.js';
 import ClinicRequest from '../models/ClinicRequest.js';
+import AuditLog from '../models/AuditLog.js';
 import { isMongoConnected } from '../config/db.js';
+import { logger } from '../utils/logger.js';
 
 // In-Memory Database di fallback
 let memoryData = {
@@ -21,7 +23,8 @@ let memoryData = {
   therapies: [],
   vaccinations: [],
   appointments: [],
-  clinicRequests: []
+  clinicRequests: [],
+  auditLogs: []
 };
 
 // Generatore ID univoci per il fallback in-memory (compatibili con stringhe ObjectId)
@@ -414,7 +417,9 @@ export const initSeedData = async () => {
     visits,
     therapies,
     vaccinations,
-    appointments
+    appointments,
+    clinicRequests: [],
+    auditLogs: []
   };
 
   // Se MongoDB è connesso, verifichiamo e popoliamo se il database è vuoto
@@ -526,6 +531,25 @@ export const dataStore = {
     };
     memoryData.users.push(newUser);
     return newUser;
+  },
+
+  async updateUser(id, updateData) {
+    if (shouldUseMongo()) {
+      const updated = await User.findByIdAndUpdate(
+        id,
+        { $set: updateData },
+        { new: true, runValidators: true }
+      ).populate('ambulatori');
+      return updated;
+    }
+    const index = memoryData.users.findIndex((u) => u._id.toString() === id.toString());
+    if (index === -1) return null;
+    memoryData.users[index] = {
+      ...memoryData.users[index],
+      ...updateData,
+      updatedAt: new Date().toISOString()
+    };
+    return await this.findUserById(id);
   },
 
   // Helper per ottenere gli ID degli ambulatori a cui l'utente ha accesso
@@ -1211,7 +1235,11 @@ export const dataStore = {
       if (clinicIds) query.ambulatorioId = { $in: clinicIds };
       if (petId) query.animaleId = petId;
       if (data) query.data = data;
-      let q = Visit.find(query).populate('animaleId').populate('veterinarioId').populate('ambulatorioId').sort({ data: -1, createdAt: -1 });
+      let q = Visit.find(query)
+        .populate({ path: 'animaleId', populate: { path: 'proprietarioId' } })
+        .populate('veterinarioId', 'nome cognome email telefono codiceAlbo ruolo')
+        .populate('ambulatorioId')
+        .sort({ data: -1, createdAt: -1 });
       if (limit) q = q.limit(Number(limit));
       return await q;
     }
@@ -1231,12 +1259,20 @@ export const dataStore = {
 
     return list.map((v) => {
       const pet = memoryData.pets.find((p) => p._id.toString() === v.animaleId?.toString());
+      let populatedPet = pet;
+      if (pet) {
+        const owner = memoryData.owners.find((o) => o._id.toString() === pet.proprietarioId?.toString());
+        populatedPet = {
+          ...pet,
+          proprietarioId: owner || pet.proprietarioId
+        };
+      }
       const vet = memoryData.users.find((u) => u._id.toString() === v.veterinarioId?.toString());
       const clinic = memoryData.clinics.find((c) => c._id.toString() === v.ambulatorioId?.toString());
       return {
         ...v,
-        animaleId: pet || v.animaleId,
-        veterinarioId: vet ? { _id: vet._id, nome: vet.nome, cognome: vet.cognome } : v.veterinarioId,
+        animaleId: populatedPet || v.animaleId,
+        veterinarioId: vet ? { _id: vet._id, nome: vet.nome, cognome: vet.cognome, codiceAlbo: vet.codiceAlbo, email: vet.email, telefono: vet.telefono, ruolo: vet.ruolo } : v.veterinarioId,
         ambulatorioId: clinic || v.ambulatorioId
       };
     });
@@ -1244,17 +1280,28 @@ export const dataStore = {
 
   async getVisitById(id) {
     if (shouldUseMongo()) {
-      return await Visit.findById(id).populate('animaleId').populate('veterinarioId').populate('ambulatorioId');
+      return await Visit.findById(id)
+        .populate({ path: 'animaleId', populate: { path: 'proprietarioId' } })
+        .populate('veterinarioId', 'nome cognome email telefono codiceAlbo ruolo')
+        .populate('ambulatorioId');
     }
     const visit = memoryData.visits.find((v) => v._id.toString() === id.toString());
     if (!visit) return null;
     const pet = memoryData.pets.find((p) => p._id.toString() === visit.animaleId?.toString());
+    let populatedPet = pet;
+    if (pet) {
+      const owner = memoryData.owners.find((o) => o._id.toString() === pet.proprietarioId?.toString());
+      populatedPet = {
+        ...pet,
+        proprietarioId: owner || pet.proprietarioId
+      };
+    }
     const vet = memoryData.users.find((u) => u._id.toString() === visit.veterinarioId?.toString());
     const clinic = memoryData.clinics.find((c) => c._id.toString() === visit.ambulatorioId?.toString());
     return {
       ...visit,
-      animaleId: pet || visit.animaleId,
-      veterinarioId: vet ? { _id: vet._id, nome: vet.nome, cognome: vet.cognome } : visit.veterinarioId,
+      animaleId: populatedPet || visit.animaleId,
+      veterinarioId: vet ? { _id: vet._id, nome: vet.nome, cognome: vet.cognome, codiceAlbo: vet.codiceAlbo, email: vet.email, telefono: vet.telefono, ruolo: vet.ruolo } : visit.veterinarioId,
       ambulatorioId: clinic || visit.ambulatorioId
     };
   },
@@ -1396,6 +1443,16 @@ export const dataStore = {
         }
       }
 
+      await this.createAuditLog({
+        azione: 'CREATE',
+        entita: 'Visit',
+        entitaId: saved._id,
+        descrizione: `Registrata visita clinica (${visitData.tipoVisita || 'Controllo'}) - Motivo: ${visitData.motivo}`,
+        ambulatorioId: visitData.ambulatorioId,
+        operatoreId: visitData.veterinarioId,
+        dettagli: { tipoVisita: visitData.tipoVisita, motivo: visitData.motivo, diagnosi: visitData.diagnosi, animaleId: visitData.animaleId }
+      });
+
       const populatedVisit = await saved.populate(['animaleId', 'veterinarioId', 'ambulatorioId']);
       const visitObj = populatedVisit.toObject ? populatedVisit.toObject() : populatedVisit;
       return { ...visitObj, appuntamento: linkedApp };
@@ -1458,6 +1515,16 @@ export const dataStore = {
       newVisit.appuntamentoId = linkedApp._id;
     }
 
+    await this.createAuditLog({
+      azione: 'CREATE',
+      entita: 'Visit',
+      entitaId: newVisit._id,
+      descrizione: `Registrata visita clinica (${visitData.tipoVisita || 'Controllo'}) - Motivo: ${visitData.motivo}`,
+      ambulatorioId: visitData.ambulatorioId,
+      operatoreId: visitData.veterinarioId,
+      dettagli: { tipoVisita: visitData.tipoVisita, motivo: visitData.motivo, diagnosi: visitData.diagnosi, animaleId: visitData.animaleId }
+    });
+
     return { ...newVisit, animaleId: pet || newVisit.animaleId, appuntamento: linkedApp };
   },
 
@@ -1519,6 +1586,16 @@ export const dataStore = {
         await Appointment.findOneAndUpdate(appQuery, appUpdate);
       }
 
+      await this.createAuditLog({
+        azione: 'UPDATE',
+        entita: 'Visit',
+        entitaId: id,
+        descrizione: `Aggiornata visita clinica (Stato: ${updateData.stato || updated.stato})`,
+        ambulatorioId: updated.ambulatorioId?._id || updated.ambulatorioId,
+        operatoreId: updateData.veterinarioId || updated.veterinarioId?._id || updated.veterinarioId,
+        dettagli: { stato: updateData.stato, motivo: updateData.motivo, diagnosi: updateData.diagnosi }
+      });
+
       return updated;
     }
 
@@ -1542,6 +1619,16 @@ export const dataStore = {
       }
     }
 
+    await this.createAuditLog({
+      azione: 'UPDATE',
+      entita: 'Visit',
+      entitaId: id,
+      descrizione: `Aggiornata visita clinica (Stato: ${updateData.stato || memoryData.visits[index].stato})`,
+      ambulatorioId: memoryData.visits[index].ambulatorioId,
+      operatoreId: updateData.veterinarioId || memoryData.visits[index].veterinarioId,
+      dettagli: { stato: updateData.stato, motivo: updateData.motivo, diagnosi: updateData.diagnosi }
+    });
+
     const pet = memoryData.pets.find((p) => p._id.toString() === memoryData.visits[index].animaleId?.toString());
     return { ...memoryData.visits[index], animaleId: pet || memoryData.visits[index].animaleId };
   },
@@ -1556,6 +1643,14 @@ export const dataStore = {
         } else {
           await Appointment.deleteMany({ visitaId: id });
         }
+
+        await this.createAuditLog({
+          azione: 'DELETE',
+          entita: 'Visit',
+          entitaId: id,
+          descrizione: `Eliminata visita clinica per animale ${visit.animaleId}`,
+          ambulatorioId: visit.ambulatorioId
+        });
       }
       return await Visit.findByIdAndDelete(id);
     }
@@ -1572,6 +1667,14 @@ export const dataStore = {
           a.visitaId?.toString() === id.toString()
         )
     );
+
+    await this.createAuditLog({
+      azione: 'DELETE',
+      entita: 'Visit',
+      entitaId: id,
+      descrizione: `Eliminata visita clinica per animale ${removedVisit.animaleId}`,
+      ambulatorioId: removedVisit.ambulatorioId
+    });
 
     return removedVisit;
   },
@@ -1799,6 +1902,8 @@ export const dataStore = {
         .populate('animaleId')
         .populate('proprietarioId')
         .populate('ambulatorioId')
+        .populate('veterinarioId', 'nome cognome email codiceAlbo ruolo avatarUrl')
+        .populate({ path: 'visitaId', populate: { path: 'veterinarioId', select: 'nome cognome email codiceAlbo' } })
         .sort({ data: 1, oraInizio: 1 });
     }
 
@@ -1824,33 +1929,49 @@ export const dataStore = {
       const pet = memoryData.pets.find((p) => p._id.toString() === a.animaleId?.toString());
       const owner = memoryData.owners.find((o) => o._id.toString() === a.proprietarioId?.toString());
       const clinic = memoryData.clinics.find((c) => c._id.toString() === a.ambulatorioId?.toString());
+      const vet = memoryData.users.find((u) => u._id.toString() === a.veterinarioId?.toString());
+      const visit = memoryData.visits.find((v) => v._id.toString() === a.visitaId?.toString());
+      const visitVet = visit ? memoryData.users.find((u) => u._id.toString() === visit.veterinarioId?.toString()) : null;
       return {
         ...a,
         animaleId: pet || a.animaleId,
         proprietarioId: owner || a.proprietarioId,
-        ambulatorioId: clinic || a.ambulatorioId
+        ambulatorioId: clinic || a.ambulatorioId,
+        veterinarioId: vet ? { _id: vet._id, nome: vet.nome, cognome: vet.cognome, email: vet.email, codiceAlbo: vet.codiceAlbo } : a.veterinarioId,
+        visitaId: visit ? { ...visit, veterinarioId: visitVet ? { _id: visitVet._id, nome: visitVet.nome, cognome: visitVet.cognome } : visit.veterinarioId } : a.visitaId
       };
     });
   },
 
   async getAppointmentById(id) {
     if (shouldUseMongo()) {
-      return await Appointment.findById(id).populate('animaleId').populate('proprietarioId').populate('ambulatorioId');
+      return await Appointment.findById(id)
+        .populate('animaleId')
+        .populate('proprietarioId')
+        .populate('ambulatorioId')
+        .populate('veterinarioId', 'nome cognome email codiceAlbo ruolo avatarUrl')
+        .populate({ path: 'visitaId', populate: { path: 'veterinarioId', select: 'nome cognome email codiceAlbo' } });
     }
     const app = memoryData.appointments.find((a) => a._id.toString() === id.toString());
     if (!app) return null;
     const pet = memoryData.pets.find((p) => p._id.toString() === app.animaleId?.toString());
     const owner = memoryData.owners.find((o) => o._id.toString() === app.proprietarioId?.toString());
     const clinic = memoryData.clinics.find((c) => c._id.toString() === app.ambulatorioId?.toString());
+    const vet = memoryData.users.find((u) => u._id.toString() === app.veterinarioId?.toString());
+    const visit = memoryData.visits.find((v) => v._id.toString() === app.visitaId?.toString());
+    const visitVet = visit ? memoryData.users.find((u) => u._id.toString() === visit.veterinarioId?.toString()) : null;
     return {
       ...app,
       animaleId: pet || app.animaleId,
       proprietarioId: owner || app.proprietarioId,
-      ambulatorioId: clinic || app.ambulatorioId
+      ambulatorioId: clinic || app.ambulatorioId,
+      veterinarioId: vet ? { _id: vet._id, nome: vet.nome, cognome: vet.cognome, email: vet.email, codiceAlbo: vet.codiceAlbo } : app.veterinarioId,
+      visitaId: visit ? { ...visit, veterinarioId: visitVet ? { _id: visitVet._id, nome: visitVet.nome, cognome: visitVet.cognome } : visit.veterinarioId } : app.visitaId
     };
   },
 
   async checkAppointmentConflict(ambulatorioId, data, oraInizio, oraFine, excludeId = null) {
+    // Helper informativo non bloccante
     const safeFine = oraFine || oraInizio;
     if (shouldUseMongo()) {
       const query = {
@@ -1879,22 +2000,29 @@ export const dataStore = {
   },
 
   async createAppointment(appData) {
-    if (appData.stato !== 'Annullato') {
-      const conflict = await this.checkAppointmentConflict(
-        appData.ambulatorioId,
-        appData.data,
-        appData.oraInizio,
-        appData.oraFine
-      );
-      if (conflict) {
-        throw new Error('CONFLITTO_ORARIO: Esiste già un appuntamento attivo in questo ambulatorio per lo slot orario selezionato.');
-      }
-    }
-
+    // Consente visite e appuntamenti paralleli nello stesso slot orario
     if (shouldUseMongo()) {
       const app = new Appointment(appData);
-      return await (await app.save()).populate(['animaleId', 'proprietarioId', 'ambulatorioId']);
+      const saved = await (await app.save()).populate([
+        'animaleId',
+        'proprietarioId',
+        'ambulatorioId',
+        { path: 'veterinarioId', select: 'nome cognome email codiceAlbo ruolo avatarUrl' }
+      ]);
+
+      await this.createAuditLog({
+        azione: 'CREATE',
+        entita: 'Appointment',
+        entitaId: saved._id,
+        descrizione: `Fissato appuntamento per data ${appData.data} alle ore ${appData.oraInizio} (${appData.motivo || 'Visita'})`,
+        ambulatorioId: appData.ambulatorioId,
+        operatoreId: appData.veterinarioId,
+        dettagli: { data: appData.data, oraInizio: appData.oraInizio, motivo: appData.motivo, animaleId: appData.animaleId }
+      });
+
+      return saved;
     }
+
     const newApp = {
       _id: generateId(),
       stato: 'Prenotato',
@@ -1904,50 +2032,190 @@ export const dataStore = {
     memoryData.appointments.push(newApp);
     const pet = memoryData.pets.find((p) => p._id.toString() === newApp.animaleId?.toString());
     const owner = memoryData.owners.find((o) => o._id.toString() === newApp.proprietarioId?.toString());
-    return { ...newApp, animaleId: pet || newApp.animaleId, proprietarioId: owner || newApp.proprietarioId };
+    const clinic = memoryData.clinics.find((c) => c._id.toString() === newApp.ambulatorioId?.toString());
+    const vet = memoryData.users.find((u) => u._id.toString() === newApp.veterinarioId?.toString());
+
+    await this.createAuditLog({
+      azione: 'CREATE',
+      entita: 'Appointment',
+      entitaId: newApp._id,
+      descrizione: `Fissato appuntamento per data ${appData.data} alle ore ${appData.oraInizio} (${appData.motivo || 'Visita'})`,
+      ambulatorioId: appData.ambulatorioId,
+      operatoreId: appData.veterinarioId,
+      dettagli: { data: appData.data, oraInizio: appData.oraInizio, motivo: appData.motivo, animaleId: appData.animaleId }
+    });
+
+    return {
+      ...newApp,
+      animaleId: pet || newApp.animaleId,
+      proprietarioId: owner || newApp.proprietarioId,
+      ambulatorioId: clinic || newApp.ambulatorioId,
+      veterinarioId: vet ? { _id: vet._id, nome: vet.nome, cognome: vet.cognome, email: vet.email } : newApp.veterinarioId
+    };
   },
 
   async updateAppointment(id, updateData) {
     const existing = await this.getAppointmentById(id);
     if (!existing) return null;
 
-    const mergedAmb = updateData.ambulatorioId || (existing.ambulatorioId?._id || existing.ambulatorioId);
-    const mergedData = updateData.data || existing.data;
-    const mergedInizio = updateData.oraInizio || existing.oraInizio;
-    const mergedFine = updateData.oraFine || existing.oraFine;
-    const mergedStato = updateData.stato || existing.stato;
-
-    if (mergedStato !== 'Annullato') {
-      const conflict = await this.checkAppointmentConflict(
-        mergedAmb,
-        mergedData,
-        mergedInizio,
-        mergedFine,
-        id
-      );
-      if (conflict) {
-        throw new Error('CONFLITTO_ORARIO: Esiste già un appuntamento attivo in questo ambulatorio per lo slot orario selezionato.');
-      }
-    }
-
     if (shouldUseMongo()) {
-      return await Appointment.findByIdAndUpdate(id, updateData, { new: true }).populate(['animaleId', 'proprietarioId', 'ambulatorioId']);
+      const updated = await Appointment.findByIdAndUpdate(id, updateData, { new: true })
+        .populate([
+          'animaleId',
+          'proprietarioId',
+          'ambulatorioId',
+          { path: 'veterinarioId', select: 'nome cognome email codiceAlbo ruolo avatarUrl' }
+        ]);
+
+      await this.createAuditLog({
+        azione: updateData.stato && updateData.stato !== existing.stato ? 'STATUS_CHANGE' : 'UPDATE',
+        entita: 'Appointment',
+        entitaId: id,
+        descrizione: `Aggiornato appuntamento (Stato: ${updateData.stato || existing.stato})`,
+        ambulatorioId: existing.ambulatorioId?._id || existing.ambulatorioId,
+        operatoreId: updateData.veterinarioId || existing.veterinarioId?._id || existing.veterinarioId,
+        dettagli: { prima: { stato: existing.stato, data: existing.data, ora: existing.oraInizio }, dopo: updateData }
+      });
+
+      return updated;
     }
+
     const index = memoryData.appointments.findIndex((a) => a._id.toString() === id.toString());
     if (index === -1) return null;
     memoryData.appointments[index] = { ...memoryData.appointments[index], ...updateData };
     const pet = memoryData.pets.find((p) => p._id.toString() === memoryData.appointments[index].animaleId?.toString());
     const owner = memoryData.owners.find((o) => o._id.toString() === memoryData.appointments[index].proprietarioId?.toString());
-    return { ...memoryData.appointments[index], animaleId: pet || memoryData.appointments[index].animaleId, proprietarioId: owner || memoryData.appointments[index].proprietarioId };
+    const clinic = memoryData.clinics.find((c) => c._id.toString() === memoryData.appointments[index].ambulatorioId?.toString());
+    const vet = memoryData.users.find((u) => u._id.toString() === memoryData.appointments[index].veterinarioId?.toString());
+
+    await this.createAuditLog({
+      azione: updateData.stato && updateData.stato !== existing.stato ? 'STATUS_CHANGE' : 'UPDATE',
+      entita: 'Appointment',
+      entitaId: id,
+      descrizione: `Aggiornato appuntamento (Stato: ${updateData.stato || existing.stato})`,
+      ambulatorioId: existing.ambulatorioId?._id || existing.ambulatorioId,
+      operatoreId: updateData.veterinarioId || existing.veterinarioId?._id || existing.veterinarioId,
+      dettagli: { prima: { stato: existing.stato, data: existing.data, ora: existing.oraInizio }, dopo: updateData }
+    });
+
+    return {
+      ...memoryData.appointments[index],
+      animaleId: pet || memoryData.appointments[index].animaleId,
+      proprietarioId: owner || memoryData.appointments[index].proprietarioId,
+      ambulatorioId: clinic || memoryData.appointments[index].ambulatorioId,
+      veterinarioId: vet ? { _id: vet._id, nome: vet.nome, cognome: vet.cognome, email: vet.email } : memoryData.appointments[index].veterinarioId
+    };
   },
 
   async deleteAppointment(id) {
+    const existing = await this.getAppointmentById(id);
     if (shouldUseMongo()) {
-      return await Appointment.findByIdAndDelete(id);
+      const deleted = await Appointment.findByIdAndDelete(id);
+      if (deleted) {
+        await this.createAuditLog({
+          azione: 'DELETE',
+          entita: 'Appointment',
+          entitaId: id,
+          descrizione: `Cancellato appuntamento del ${existing?.data} ore ${existing?.oraInizio}`,
+          ambulatorioId: existing?.ambulatorioId?._id || existing?.ambulatorioId
+        });
+      }
+      return deleted;
     }
     const index = memoryData.appointments.findIndex((a) => a._id.toString() === id.toString());
     if (index === -1) return null;
-    return memoryData.appointments.splice(index, 1)[0];
+    const removed = memoryData.appointments.splice(index, 1)[0];
+
+    await this.createAuditLog({
+      azione: 'DELETE',
+      entita: 'Appointment',
+      entitaId: id,
+      descrizione: `Cancellato appuntamento del ${removed?.data} ore ${removed?.oraInizio}`,
+      ambulatorioId: removed?.ambulatorioId?._id || removed?.ambulatorioId
+    });
+
+    return removed;
+  },
+
+  // === REGISTRO AUDIT MEDICO-LEGALE (AUDIT LOGS) ===
+  async createAuditLog(logData) {
+    let operatoreNome = logData.operatoreNome;
+    if (!operatoreNome && logData.operatoreId) {
+      const user = await this.findUserById(logData.operatoreId);
+      if (user) {
+        operatoreNome = `Dott. ${user.nome} ${user.cognome}`;
+      }
+    }
+
+    const logEntry = {
+      azione: logData.azione,
+      entita: logData.entita,
+      entitaId: logData.entitaId ? logData.entitaId.toString() : '',
+      descrizione: logData.descrizione,
+      ambulatorioId: logData.ambulatorioId,
+      operatoreId: logData.operatoreId,
+      operatoreNome: operatoreNome || 'Sistema / Operatore',
+      dettagli: logData.dettagli || {},
+      ipAddress: logData.ipAddress || '',
+      userAgent: logData.userAgent || '',
+      createdAt: new Date().toISOString()
+    };
+
+    if (shouldUseMongo()) {
+      try {
+        const audit = new AuditLog(logEntry);
+        await audit.save();
+      } catch (err) {
+        logger.error('Errore nel salvataggio audit log su MongoDB', err);
+      }
+      return logEntry;
+    }
+
+    const newEntry = { _id: generateId(), ...logEntry };
+    memoryData.auditLogs = memoryData.auditLogs || [];
+    memoryData.auditLogs.unshift(newEntry);
+    if (memoryData.auditLogs.length > 500) {
+      memoryData.auditLogs.pop();
+    }
+    return newEntry;
+  },
+
+  async logAudit(logData) {
+    return this.createAuditLog(logData);
+  },
+
+  async getAuditLogs(filters = {}, vetId = null) {
+    const { ambulatorioId, entita, entitaId, limit = 100 } = filters;
+    const allowedClinics = await this.resolveClinicFilter(ambulatorioId, vetId);
+
+    if (allowedClinics && allowedClinics.length === 0) {
+      return [];
+    }
+
+    if (shouldUseMongo()) {
+      const query = {};
+      if (allowedClinics) query.ambulatorioId = { $in: allowedClinics };
+      if (entita) query.entita = entita;
+      if (entitaId) query.entitaId = entitaId.toString();
+
+      return await AuditLog.find(query)
+        .populate('operatoreId', 'nome cognome email codiceAlbo ruolo')
+        .populate('ambulatorioId', 'nome coloreTema')
+        .sort({ createdAt: -1 })
+        .limit(limit);
+    }
+
+    let list = [...(memoryData.auditLogs || [])];
+    if (allowedClinics) {
+      list = list.filter((l) => !l.ambulatorioId || allowedClinics.includes(l.ambulatorioId.toString()));
+    }
+    if (entita) {
+      list = list.filter((l) => l.entita === entita);
+    }
+    if (entitaId) {
+      list = list.filter((l) => l.entitaId?.toString() === entitaId.toString());
+    }
+    return list.slice(0, limit);
   },
 
   // === STATISTICHE DASHBOARD ===

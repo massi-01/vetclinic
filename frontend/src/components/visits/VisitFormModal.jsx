@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, ClipboardList, Stethoscope, Pill, HeartPulse, Calendar } from 'lucide-react';
+import { X, ClipboardList, Stethoscope, Pill, HeartPulse, Calendar, Printer } from 'lucide-react';
 import { useClinic } from '../../context/ClinicContext';
 import { api } from '../../services/api';
+import { VisitReportModal } from './VisitReportModal';
 
 // Arrotonda l'orario alla mezz'ora più vicina (:00 o :30)
 const roundTimeToHalfHour = (timeStrOrDate) => {
@@ -48,6 +49,7 @@ export const VisitFormModal = ({
   const [pets, setPets] = useState([]);
   const [loadingPets, setLoadingPets] = useState(false);
   const [includeTherapy, setIncludeTherapy] = useState(false);
+  const [showReportPreview, setShowReportPreview] = useState(false);
 
   const [formData, setFormData] = useState({
     animaleId: defaultPet?._id || '',
@@ -507,15 +509,45 @@ export const VisitFormModal = ({
             )}
           </div>
 
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
-              Annulla
-            </button>
-            <button id="btn-save-visit" type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Salvataggio in corso...' : initialData ? 'Salva Modifiche' : 'Registra Visita'}
-            </button>
+          <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              {initialData && (
+                <button
+                  type="button"
+                  id="btn-print-from-visit-form"
+                  className="btn btn-secondary"
+                  onClick={() => setShowReportPreview(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    color: 'var(--primary)',
+                    fontWeight: '700'
+                  }}
+                >
+                  <Printer size={15} />
+                  <span>Anteprima Referto</span>
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+                Annulla
+              </button>
+              <button id="btn-save-visit" type="submit" className="btn btn-primary" disabled={saving}>
+                {saving ? 'Salvataggio in corso...' : initialData ? 'Salva Modifiche' : 'Registra Visita'}
+              </button>
+            </div>
           </div>
         </form>
+
+        {/* Modale Referto Ufficiale & Stampa PDF */}
+        <VisitReportModal
+          isOpen={showReportPreview}
+          onClose={() => setShowReportPreview(false)}
+          visit={initialData}
+        />
       </div>
     </div>
   );

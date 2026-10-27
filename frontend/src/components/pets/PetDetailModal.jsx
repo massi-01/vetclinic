@@ -18,10 +18,13 @@ import {
   MapPin,
   CheckCircle,
   Syringe,
-  Trash2
+  Trash2,
+  ShieldCheck,
+  Printer
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import { VisitReportModal } from '../visits/VisitReportModal';
 
 export const PetDetailModal = ({
   isOpen,
@@ -35,23 +38,29 @@ export const PetDetailModal = ({
   const toast = useToast();
   const [pet, setPet] = useState(null);
   const [vaccinations, setVaccinations] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [selectedVisitForReport, setSelectedVisitForReport] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('anagrafica'); // 'anagrafica', 'visite', 'terapie', 'peso', 'vaccini'
+  const [activeTab, setActiveTab] = useState('anagrafica'); // 'anagrafica', 'visite', 'terapie', 'peso', 'vaccini', 'audit'
   const [error, setError] = useState('');
 
   const loadPetDetails = async () => {
     if (!petId) return;
     try {
       setLoading(true);
-      const [petRes, vacRes] = await Promise.all([
+      const [petRes, vacRes, auditRes] = await Promise.all([
         api.pets.getById(petId),
-        api.vaccinations.getAll({ petId })
+        api.vaccinations.getAll({ petId }),
+        api.auditLogs.getAll({ entitaId: petId }).catch(() => ({ success: false, data: [] }))
       ]);
       if (petRes.success) {
         setPet(petRes.data);
       }
       if (vacRes.success) {
         setVaccinations(vacRes.data);
+      }
+      if (auditRes.success) {
+        setAuditLogs(auditRes.data);
       }
     } catch (err) {
       setError(err.message || 'Errore nel caricamento cartella clinica');
@@ -179,6 +188,14 @@ export const PetDetailModal = ({
             >
               <Syringe size={15} style={{ display: 'inline', marginRight: '5px' }} />
               Vaccini ({vaccinations.length})
+            </button>
+            <button
+              id="tab-btn-audit"
+              className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`}
+              onClick={() => setActiveTab('audit')}
+            >
+              <ShieldCheck size={15} style={{ display: 'inline', marginRight: '5px' }} />
+              Audit Log ({auditLogs.length})
             </button>
           </div>
         </div>
@@ -336,7 +353,30 @@ export const PetDetailModal = ({
                               {visit.motivo}
                             </h4>
                           </div>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)' }}>Ore {visit.ora}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)' }}>Ore {visit.ora}</span>
+                            <button
+                              type="button"
+                              className="btn btn-sm"
+                              onClick={() => setSelectedVisitForReport(visit)}
+                              style={{
+                                fontSize: '0.75rem',
+                                padding: '3px 9px',
+                                background: 'var(--primary-subtle)',
+                                color: 'var(--primary)',
+                                border: '1px solid var(--primary-light)',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontWeight: '700'
+                              }}
+                              title="Stampa Referto Ufficiale / Salva in PDF"
+                            >
+                              <Printer size={12} /> Stampa Referto
+                            </button>
+                          </div>
                         </div>
 
                         {visit.diagnosi && (
@@ -596,6 +636,93 @@ export const PetDetailModal = ({
                   )}
                 </div>
               )}
+
+              {/* TAB 6: Audit Log Medico-Legale */}
+              {activeTab === 'audit' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+                    <div>
+                      <h4 style={{ fontSize: '0.95rem', fontWeight: '800', color: 'var(--slate-900)' }}>
+                        Registro di Tracciabilità Medico-Legale
+                      </h4>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--slate-500)' }}>
+                        Tracciamento immutabile di tutte le operazioni cliniche eseguite sulla cartella di questo paziente.
+                      </p>
+                    </div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '700', padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)', backgroundColor: '#ecfdf5', color: '#047857' }}>
+                      {auditLogs.length} Eventi Tracciati
+                    </span>
+                  </div>
+
+                  {auditLogs.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--slate-400)' }}>
+                      Nessun evento audit registrato per questo paziente finora.
+                    </div>
+                  ) : (
+                    auditLogs.map((log) => {
+                      const logDate = new Date(log.createdAt || log.timestamp).toLocaleString('it-IT', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      });
+
+                      const actionColors = {
+                        CREATE: { bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' },
+                        UPDATE: { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
+                        DELETE: { bg: '#fff1f2', color: '#be123c', border: '#fecdd3' },
+                        STATUS_CHANGE: { bg: '#fffbeb', color: '#b45309', border: '#fde68a' }
+                      };
+                      const style = actionColors[log.azione] || { bg: '#f8fafc', color: '#475569', border: '#e2e8f0' };
+
+                      return (
+                        <div
+                          key={log._id}
+                          style={{
+                            padding: '0.75rem 1rem',
+                            borderRadius: 'var(--radius-md)',
+                            border: `1px solid ${style.border}`,
+                            backgroundColor: style.bg,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.35rem'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span
+                                style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: '800',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: 'var(--radius-sm)',
+                                  backgroundColor: '#ffffff',
+                                  color: style.color,
+                                  border: `1px solid ${style.border}`
+                                }}
+                              >
+                                {log.azione} • {log.entita}
+                              </span>
+                              <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--slate-800)' }}>
+                                {log.descrizione}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--slate-500)' }}>
+                              {logDate}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: 'var(--slate-600)', paddingTop: '0.2rem' }}>
+                            <span><strong>Operatore:</strong> {log.operatoreNome || 'Sistema'}</span>
+                            {log.ipAddress && <span><strong>IP:</strong> {log.ipAddress}</span>}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -620,6 +747,13 @@ export const PetDetailModal = ({
             <PlusCircle size={15} /> Nuova Visita
           </button>
         </div>
+
+        {/* Modale Referto Ufficiale & Stampa PDF */}
+        <VisitReportModal
+          isOpen={Boolean(selectedVisitForReport)}
+          onClose={() => setSelectedVisitForReport(null)}
+          visit={selectedVisitForReport}
+        />
       </div>
     </div>
   );

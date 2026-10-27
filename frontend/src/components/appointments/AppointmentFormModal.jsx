@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, User, Heart, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Calendar, Clock, User, Heart, CheckCircle2, AlertCircle, Stethoscope } from 'lucide-react';
 import { useClinic } from '../../context/ClinicContext';
+import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 
 export const AppointmentFormModal = ({
@@ -13,6 +14,7 @@ export const AppointmentFormModal = ({
   initialData = null
 }) => {
   const { activeClinic, clinics } = useClinic();
+  const { user } = useAuth();
   const [pets, setPets] = useState([]);
   const [owners, setOwners] = useState([]);
 
@@ -22,6 +24,7 @@ export const AppointmentFormModal = ({
     animaleId: '',
     proprietarioId: '',
     ambulatorioId: activeClinic?._id || clinics[0]?._id || '',
+    veterinarioId: user?._id || '',
     data: todayStr,
     oraInizio: '09:00',
     durataMinuti: 30,
@@ -43,6 +46,7 @@ export const AppointmentFormModal = ({
           animaleId: initialData.animaleId?._id || initialData.animaleId || '',
           proprietarioId: initialData.proprietarioId?._id || initialData.proprietarioId || '',
           ambulatorioId: initialData.ambulatorioId?._id || initialData.ambulatorioId || activeClinic?._id || clinics[0]?._id || '',
+          veterinarioId: initialData.veterinarioId?._id || initialData.veterinarioId || user?._id || '',
           data: initialData.data || todayStr,
           oraInizio: initialData.oraInizio || '09:00',
           durataMinuti: initialData.durataMinuti || 30,
@@ -57,6 +61,7 @@ export const AppointmentFormModal = ({
           animaleId: defaultPet?._id || '',
           proprietarioId: defaultPet?.proprietarioId?._id || defaultPet?.proprietarioId || '',
           ambulatorioId: defaultPet?.ambulatorioId?._id || defaultPet?.ambulatorioId || activeClinic?._id || clinics[0]?._id || '',
+          veterinarioId: user?._id || prev.veterinarioId || '',
           data: defaultDate || todayStr,
           oraInizio: defaultTime || '09:00',
           durataMinuti: 30,
@@ -68,7 +73,7 @@ export const AppointmentFormModal = ({
       }
       setError('');
     }
-  }, [isOpen, defaultDate, defaultTime, defaultPet, initialData, activeClinic]);
+  }, [isOpen, defaultDate, defaultTime, defaultPet, initialData, activeClinic, user]);
 
   const loadData = async () => {
     try {
@@ -113,6 +118,7 @@ export const AppointmentFormModal = ({
         animaleId: formData.animaleId,
         proprietarioId: formData.proprietarioId || undefined,
         ambulatorioId: formData.ambulatorioId,
+        veterinarioId: formData.veterinarioId || user?._id || undefined,
         data: formData.data,
         oraInizio: formData.oraInizio,
         durataMinuti: Number(formData.durataMinuti) || 30,
@@ -139,6 +145,9 @@ export const AppointmentFormModal = ({
       setSaving(false);
     }
   };
+
+  const selectedClinic = clinics.find((c) => c._id === formData.ambulatorioId) || activeClinic;
+  const clinicVets = selectedClinic?.veterinari || [];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -181,24 +190,24 @@ export const AppointmentFormModal = ({
               </select>
             </div>
 
-            <div className="form-row form-row-2">
-              <div className="form-group">
-                <label className="form-label">Proprietario Associato</label>
-                <select
-                  id="apt-select-owner"
-                  className="form-select"
-                  value={formData.proprietarioId}
-                  onChange={(e) => setFormData({ ...formData, proprietarioId: e.target.value })}
-                >
-                  <option value="">-- Nessuno o Seleziona Proprietario --</option>
-                  {owners.map((o) => (
-                    <option key={o._id} value={o._id}>
-                      {o.nome} {o.cognome} ({o.telefono || 'No tel'})
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="form-group">
+              <label className="form-label">Proprietario Associato</label>
+              <select
+                id="apt-select-owner"
+                className="form-select"
+                value={formData.proprietarioId}
+                onChange={(e) => setFormData({ ...formData, proprietarioId: e.target.value })}
+              >
+                <option value="">-- Nessuno o Seleziona Proprietario --</option>
+                {owners.map((o) => (
+                  <option key={o._id} value={o._id}>
+                    {o.nome} {o.cognome} ({o.telefono || 'No tel'})
+                  </option>
+                ))}
+              </select>
+            </div>
 
+            <div className="form-row form-row-2">
               <div className="form-group">
                 <label className="form-label">Ambulatorio</label>
                 <select
@@ -212,6 +221,33 @@ export const AppointmentFormModal = ({
                       {c.nome}
                     </option>
                   ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <Stethoscope size={14} color="var(--primary)" />
+                  <span>Veterinario Incaricato *</span>
+                </label>
+                <select
+                  id="apt-select-vet"
+                  className="form-select"
+                  value={formData.veterinarioId}
+                  onChange={(e) => setFormData({ ...formData, veterinarioId: e.target.value })}
+                  required
+                >
+                  {user && (
+                    <option value={user._id}>
+                      Dott. {user.nome} {user.cognome} (Tu)
+                    </option>
+                  )}
+                  {clinicVets
+                    .filter((v) => (v._id || v) !== user?._id)
+                    .map((v) => (
+                      <option key={v._id || v} value={v._id || v}>
+                        Dott. {v.nome} {v.cognome} {v.codiceAlbo ? `(Albo: ${v.codiceAlbo})` : ''}
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>
