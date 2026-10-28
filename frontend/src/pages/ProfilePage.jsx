@@ -20,11 +20,13 @@ import {
   Upload,
   Image as ImageIcon,
   Trash2,
-  RotateCcw
+  RotateCcw,
+  Terminal
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useClinic } from '../context/ClinicContext';
+import { SystemLogsViewer } from '../components/system/SystemLogsViewer';
 
 // Preset di avatar professionali medici veterinari
 const PRESET_AVATARS = [
@@ -533,6 +535,30 @@ export const ProfilePage = () => {
         >
           <Building2 size={18} />
           <span>Ambulatori Collegati</span>
+        </button>
+
+        <button
+          id="profile-tab-system-logs"
+          type="button"
+          onClick={() => setActiveTab('logs')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.75rem 1.25rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'logs' ? '3px solid var(--primary)' : '3px solid transparent',
+            color: activeTab === 'logs' ? 'var(--primary)' : 'var(--slate-500)',
+            fontWeight: activeTab === 'logs' ? '700' : '600',
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            marginBottom: '-2px',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          <Terminal size={18} />
+          <span>Log di Sistema & Errori</span>
         </button>
       </div>
 
@@ -1339,6 +1365,22 @@ export const ProfilePage = () => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* CONTENUTO TAB 5: LOG DI SISTEMA */}
+      {activeTab === 'logs' && (
+        <div className="card" style={{ padding: '1.75rem', background: '#ffffff', borderRadius: 'var(--radius-lg)' }}>
+          <div style={{ marginBottom: '1.25rem' }}>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--slate-900)', margin: 0 }}>
+              Monitoraggio Operativo & File Log di Sistema
+            </h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--slate-500)', marginTop: '4px' }}>
+              Consulta i registri di sistema in tempo reale, monitora errori e chiamate API o scarica i file di testo completi.
+            </p>
+          </div>
+
+          <SystemLogsViewer />
         </div>
       )}
     </div>

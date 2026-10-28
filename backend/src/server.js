@@ -18,6 +18,7 @@ import statsRoutes from './routes/statsRoutes.js';
 import vaccinationRoutes from './routes/vaccinationRoutes.js';
 import appointmentRoutes from './routes/appointmentRoutes.js';
 import auditRoutes from './routes/auditRoutes.js';
+import systemLogRoutes from './routes/systemLogRoutes.js';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerDocument } from './config/swagger.js';
 import { logger, requestLogger } from './utils/logger.js';
@@ -256,6 +257,7 @@ app.use('/api/vaccinations', vaccinationRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/system/logs', systemLogRoutes);
 
 // Gestione rotte non trovate (404)
 app.use((req, res) => {

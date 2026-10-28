@@ -144,5 +144,29 @@ export const api = {
       const qs = new URLSearchParams(params).toString();
       return request(`/audit-logs${qs ? `?${qs}` : ''}`);
     }
+  },
+  systemLogs: {
+    getFiles: () => request('/system/logs'),
+    getEntries: (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      return request(`/system/logs/entries${qs ? `?${qs}` : ''}`);
+    },
+    clearFile: (filename) => request(`/system/logs/${filename}`, { method: 'DELETE' }),
+    download: async (filename) => {
+      const token = localStorage.getItem('vet_token');
+      const response = await fetch(`${API_BASE}/system/logs/${filename}/download`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!response.ok) throw new Error('Errore nel download del file di log');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
   }
 };

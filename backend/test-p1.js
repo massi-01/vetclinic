@@ -548,6 +548,39 @@ async function runTests() {
   assert(!mockJsonData.data.esami[0].nomeFile, 'nomeFile deve essere vuoto o nullo');
   console.log('   ✅ Rimozione allegato PDF da esame verificata con successo.\n');
 
+  // Test 16: Verifica File Logging di Sistema (combined.log ed error.log)
+  console.log('16. Verifica File Logging di Sistema (combined.log ed error.log)...');
+  const { logger: testLogger } = await import('./src/utils/logger.js');
+  const { getLogFiles, getLogEntries } = await import('./src/controllers/systemLogController.js');
+
+  const testInfoMsg = `Test Info Message ${Date.now()}`;
+  const testErrorMsg = `Test Error Critical ${Date.now()}`;
+
+  testLogger.info(testInfoMsg, { testMeta: 'active' });
+  testLogger.error(testErrorMsg, new Error('Simulated critical failure'));
+
+  // Verifica che i file info siano presenti
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await getLogFiles({ user: { _id: fakeVet._id } }, mockRes);
+  assert.strictEqual(mockStatusCode, 200);
+  assert(Array.isArray(mockJsonData.data));
+  const combinedFile = mockJsonData.data.find((f) => f.filename === 'combined.log');
+  const errorFile = mockJsonData.data.find((f) => f.filename === 'error.log');
+  assert(combinedFile, 'combined.log deve essere tracciato');
+  assert(errorFile, 'error.log deve essere tracciato');
+
+  // Verifica lettura entries con filtro level=ERROR
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await getLogEntries({
+    user: { _id: fakeVet._id },
+    query: { filename: 'error.log', level: 'ERROR' }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 200);
+  assert(mockJsonData.data.entries.some((e) => e.message === testErrorMsg), 'L\'errore deve essere presente nel file error.log');
+  console.log('   ✅ File logging persistente su combined.log ed error.log verificato con successo.\n');
+
   console.log('🎉 TUTTI I TEST P1, P2 E NUOVE FUNZIONALITÀ SONO STATI SUPERATI CON SUCCESSO!');
 }
 
