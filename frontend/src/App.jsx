@@ -433,6 +433,10 @@ const MainLayout = () => {
         onNewVisit={handleOpenNewVisit}
         onNewTherapy={handleOpenNewTherapy}
         onNewVaccination={handleOpenNewVaccination}
+        onPetDeleted={() => {
+          setIsPetDetailOpen(false);
+          triggerDataRefresh();
+        }}
       />
 
       <VisitFormModal

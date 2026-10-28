@@ -355,7 +355,158 @@ async function runTests() {
   assert(mockJsonData.token, 'Token generato al login con nuova password');
   console.log('   ✅ Modifica anagrafica profilo e aggiornamento sicuro password verificati con successo.\n');
 
-  console.log('🎉 TUTTI I TEST P1 SONO STATI SUPERATI CON SUCCESSO!');
+  // Test 11: Verifica obbligatorietà e validazione Codice Fiscale Proprietario
+  console.log('11. Verifica obbligatorietà e formato Codice Fiscale Proprietario...');
+  const { createOwner } = await import('./src/controllers/ownerController.js');
+
+  // Test senza codice fiscale
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await createOwner({
+    user: { _id: fakeVet._id },
+    body: {
+      nome: 'Giuseppe',
+      cognome: 'Verdi',
+      telefono: '3331122334',
+      ambulatorioId: clinic1._id
+    }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 400, 'Creazione proprietario senza CF deve restituire 400');
+  assert(mockJsonData.message.includes('codice fiscale'), 'Messaggio deve segnalare CF mancante');
+
+  // Test con codice fiscale di lunghezza non valida (< 16)
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await createOwner({
+    user: { _id: fakeVet._id },
+    body: {
+      nome: 'Giuseppe',
+      cognome: 'Verdi',
+      codiceFiscale: 'VRDGPP80A01',
+      telefono: '3331122334',
+      ambulatorioId: clinic1._id
+    }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 400, 'CF non di 16 caratteri deve restituire 400');
+
+  // Test con codice fiscale valido
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await createOwner({
+    user: { _id: fakeVet._id },
+    body: {
+      nome: 'Giuseppe',
+      cognome: 'Verdi',
+      codiceFiscale: 'vrdgpp80a01f205x', // minuscolo, deve diventare maiuscolo
+      telefono: '3331122334',
+      ambulatorioId: clinic1._id
+    }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 201, 'Proprietario con CF valido deve essere creato');
+  assert.strictEqual(mockJsonData.data.codiceFiscale, 'VRDGPP80A01F205X', 'CF deve essere convertito in maiuscolo');
+  console.log('   ✅ Validazione Codice Fiscale (obbligatorio, 16 char, uppercase) verificata con successo.\n');
+
+  // Test 12: Verifica Esami/Test Specialistici su Visita (Interno / Esterno / PDF)
+  console.log('12. Verifica Esami e Prestazioni Specialistiche su Visita...');
+  const { createVisit, getVisits } = await import('./src/controllers/visitController.js');
+
+  const testExams = [
+    {
+      nome: 'Emocromo Completo',
+      tipologia: 'Interno',
+      stato: 'Pronto',
+      esito: 'Valori ematici nella norma',
+      fileAllegato: 'data:application/pdf;base64,JVBERi0xLjQK...',
+      nomeFile: 'emocromo.pdf',
+      dimensioneFile: 1024
+    },
+    {
+      nome: 'Biopsia Linfonodale',
+      tipologia: 'Esterno',
+      laboratorio: 'IDEXX Laboratories',
+      stato: 'In lavorazione',
+      esito: 'In attesa di refertazione istologica'
+    }
+  ];
+
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await createVisit({
+    user: { _id: fakeVet._id },
+    body: {
+      data: '2026-11-25',
+      ora: '15:30',
+      tipoVisita: 'Visita Specialistica',
+      motivo: 'Controllo oncologico e prelievo',
+      animaleId: 'pet-123',
+      ambulatorioId: clinic1._id,
+      esami: testExams
+    }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 201, 'Creazione visita con esami deve restituire 201');
+  assert(Array.isArray(mockJsonData.data.esami), 'Esami deve essere un array');
+  assert.strictEqual(mockJsonData.data.esami.length, 2, 'Devono essere presenti 2 esami');
+  assert.strictEqual(mockJsonData.data.esami[0].tipologia, 'Interno');
+  assert.strictEqual(mockJsonData.data.esami[1].tipologia, 'Esterno');
+  assert.strictEqual(mockJsonData.data.esami[1].laboratorio, 'IDEXX Laboratories');
+  assert.strictEqual(mockJsonData.data.esami[1].stato, 'In lavorazione');
+  console.log('   ✅ Salvataggio e persistenza esami interni ed esterni verificati con successo.\n');
+
+  // Test 13: Verifica Paziente Deceduto e Data Decesso
+  console.log('13. Verifica Paziente Deceduto (dataDecesso) ed eliminazione paziente...');
+  const newDeceasedPet = await dataStore.createPet({
+    nome: 'Fido Senior',
+    specie: 'Cane',
+    razza: 'Pastore Tedesco',
+    sesso: 'Maschio',
+    proprietarioId: mockJsonData.data._id,
+    ambulatorioId: clinic1._id,
+    stato: 'Deceduto',
+    dataDecesso: '2026-10-15'
+  });
+  assert.strictEqual(newDeceasedPet.stato, 'Deceduto');
+  assert(newDeceasedPet.dataDecesso, 'Data decesso deve essere salvata');
+
+  // Verifica cancellazione dell'animale
+  await dataStore.deletePet(newDeceasedPet._id);
+  const deletedPetCheck = await dataStore.getPetById(newDeceasedPet._id);
+  assert.strictEqual(deletedPetCheck, null, 'Paziente deve essere eliminato');
+  console.log('   ✅ Stato Deceduto, dataDecesso ed eliminazione paziente verificati con successo.\n');
+
+  // Test 14: Verifica Medico Esecutore Visita e Filtro per Medico
+  console.log('14. Verifica Assegnazione Medico e Filtro Ricerca per Medico...');
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await createVisit({
+    user: { _id: fakeVet._id },
+    body: {
+      data: '2026-11-26',
+      ora: '11:00',
+      tipoVisita: 'Controllo Generale',
+      motivo: 'Visita eseguita dal Dottor Esterno',
+      animaleId: 'pet-123',
+      ambulatorioId: clinic1._id,
+      veterinarioId: fakeVet._id
+    }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 201);
+
+  // Filtra visite per veterinarioId
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await getVisits({
+    user: { _id: fakeVet._id },
+    query: {
+      clinicId: clinic1._id.toString(),
+      veterinarioId: fakeVet._id.toString()
+    }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 200);
+  assert(mockJsonData.data.length >= 1, 'Devono esserci visite filtrate per questo medico');
+  assert(mockJsonData.data.every(v => (v.veterinarioId?._id || v.veterinarioId)?.toString() === fakeVet._id.toString()), 'Tutte le visite devono appartenere al medico filtrato');
+  console.log('   ✅ Medico esecutore e filtro visite per medico verificati con successo.\n');
+
+  console.log('🎉 TUTTI I TEST P1, P2 E NUOVE FUNZIONALITÀ SONO STATI SUPERATI CON SUCCESSO!');
 }
 
 runTests().catch(err => {

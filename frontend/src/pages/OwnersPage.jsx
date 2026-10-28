@@ -5,6 +5,7 @@ import { useToast } from '../context/ToastContext';
 import { api } from '../services/api';
 import { OwnerCard } from '../components/owners/OwnerCard';
 import { SkeletonGrid } from '../components/common/SkeletonLoaders';
+import { ConfirmModal } from '../components/common/ConfirmModal';
 
 export const OwnersPage = ({ onAddPetForOwner, onNewOwner, onEditOwner, onFilterPetsByOwner, refreshTrigger }) => {
   const { activeClinic } = useClinic();
@@ -12,6 +13,8 @@ export const OwnersPage = ({ onAddPetForOwner, onNewOwner, onEditOwner, onFilter
   const [owners, setOwners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [ownerToDelete, setOwnerToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadOwners = async () => {
     try {
@@ -40,16 +43,25 @@ export const OwnersPage = ({ onAddPetForOwner, onNewOwner, onEditOwner, onFilter
     loadOwners();
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Sei sicuro di voler eliminare questo proprietario?')) return;
+  const handleDeleteClick = (id) => {
+    const owner = owners.find((o) => o._id === id);
+    setOwnerToDelete(owner || { _id: id });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!ownerToDelete?._id) return;
     try {
-      const res = await api.owners.delete(id);
+      setIsDeleting(true);
+      const res = await api.owners.delete(ownerToDelete._id);
       if (res.success) {
-        setOwners((prev) => prev.filter((o) => o._id !== id));
+        setOwners((prev) => prev.filter((o) => o._id !== ownerToDelete._id));
         toast.success('Proprietario eliminato con successo');
+        setOwnerToDelete(null);
       }
     } catch (err) {
       toast.error(err.message || 'Errore durante l\'eliminazione del proprietario');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -139,12 +151,34 @@ export const OwnersPage = ({ onAddPetForOwner, onNewOwner, onEditOwner, onFilter
               owner={owner}
               onAddPet={onAddPetForOwner}
               onEdit={onEditOwner}
-              onDelete={handleDelete}
+              onDelete={handleDeleteClick}
               onFilterPetsByOwner={onFilterPetsByOwner}
             />
           ))}
         </div>
       )}
+
+      {/* Custom Confirm Modal for Owner Deletion */}
+      <ConfirmModal
+        isOpen={Boolean(ownerToDelete)}
+        onClose={() => setOwnerToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        title="Elimina Cliente"
+        message={
+          ownerToDelete ? (
+            <span>
+              Sei sicuro di voler eliminare l'anagrafica di{' '}
+              <strong>{ownerToDelete.cognome} {ownerToDelete.nome}</strong>?
+              <br />
+              Se il cliente ha animali associati, l'eliminazione verrà bloccata per garantire l'integrità dei dati clinici.
+            </span>
+          ) : ''
+        }
+        confirmText="Elimina Cliente"
+        cancelText="Annulla"
+        type="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 };

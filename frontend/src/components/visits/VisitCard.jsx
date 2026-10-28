@@ -18,6 +18,11 @@ export const VisitCard = ({ visit, onSelectPet, onEdit, onDelete, onPrint }) => 
             <span className="badge badge-other" style={{ fontSize: '0.7rem' }}>
               <Clock size={11} style={{ marginRight: '3px' }} /> {visit.ora}
             </span>
+            {visit.esami && visit.esami.length > 0 && (
+              <span className="badge badge-other" style={{ fontSize: '0.7rem', background: '#f0fdfa', color: '#0d9488', border: '1px solid #99f6e4' }}>
+                🧪 {visit.esami.length} {visit.esami.length === 1 ? 'esame' : 'esami'}
+              </span>
+            )}
           </div>
 
           {pet && (

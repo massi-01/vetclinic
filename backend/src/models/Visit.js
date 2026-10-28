@@ -66,7 +66,63 @@ const visitSchema = new mongoose.Schema(
     appuntamentoId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Appointment'
-    }
+    },
+    esami: [
+      {
+        _id: {
+          type: mongoose.Schema.Types.ObjectId,
+          default: () => new mongoose.Types.ObjectId()
+        },
+        nome: {
+          type: String,
+          required: [true, "Il nome dell'esame è obbligatorio"],
+          trim: true
+        },
+        tipologia: {
+          type: String,
+          enum: ['Interno', 'Esterno'],
+          default: 'Interno'
+        },
+        laboratorio: {
+          type: String,
+          trim: true,
+          default: ''
+        },
+        stato: {
+          type: String,
+          enum: ['In lavorazione', 'Pronto'],
+          default: 'Pronto'
+        },
+        dataRichiesta: {
+          type: Date,
+          default: Date.now
+        },
+        dataReferto: {
+          type: Date
+        },
+        esito: {
+          type: String,
+          default: '',
+          trim: true
+        },
+        fileAllegato: {
+          type: String,
+          default: '' // Base64 data URL o link
+        },
+        nomeFile: {
+          type: String,
+          default: ''
+        },
+        tipoFile: {
+          type: String,
+          default: 'application/pdf'
+        },
+        dimensioneFile: {
+          type: Number,
+          default: 0
+        }
+      }
+    ]
   },
   {
     timestamps: true

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Dog, Cat, Plus } from 'lucide-react';
+import { X, Dog, Cat, Plus, HeartCrack } from 'lucide-react';
 import { useClinic } from '../../context/ClinicContext';
 import { api } from '../../services/api';
+import { CustomSelect } from '../common/CustomSelect';
 
 export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, defaultOwnerId = null }) => {
   const { activeClinic, clinics } = useClinic();
@@ -20,6 +21,8 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
     segniParticolari: '',
     allergie: '',
     noteCliniche: '',
+    stato: 'Attivo',
+    dataDecesso: '',
     proprietarioId: defaultOwnerId || '',
     ambulatorioId: activeClinic?._id || (clinics[0]?._id || '')
   });
@@ -43,6 +46,8 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
           segniParticolari: initialData.segniParticolari || '',
           allergie: Array.isArray(initialData.allergie) ? initialData.allergie.join(', ') : '',
           noteCliniche: initialData.noteCliniche || '',
+          stato: initialData.stato || 'Attivo',
+          dataDecesso: initialData.dataDecesso ? initialData.dataDecesso.split('T')[0] : '',
           proprietarioId: initialData.proprietarioId?._id || initialData.proprietarioId || defaultOwnerId || '',
           ambulatorioId: initialData.ambulatorioId?._id || initialData.ambulatorioId || activeClinic?._id || clinics[0]?._id || ''
         });
@@ -59,6 +64,8 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
           segniParticolari: '',
           allergie: '',
           noteCliniche: '',
+          stato: 'Attivo',
+          dataDecesso: '',
           proprietarioId: defaultOwnerId || '',
           ambulatorioId: activeClinic?._id || (clinics[0]?._id || '')
         });
@@ -101,6 +108,11 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
       return;
     }
 
+    if (formData.stato === 'Deceduto' && !formData.dataDecesso) {
+      setError('Specificare la data del decesso per l\'animale contrassegnato come Deceduto');
+      return;
+    }
+
     try {
       setSaving(true);
       setError('');
@@ -109,7 +121,8 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
         pesoAttuale: formData.pesoAttuale ? Number(formData.pesoAttuale) : 0,
         allergie: formData.allergie
           ? formData.allergie.split(',').map((s) => s.trim()).filter(Boolean)
-          : []
+          : [],
+        dataDecesso: formData.stato === 'Deceduto' ? (formData.dataDecesso || new Date()) : null
       };
 
       let result;
@@ -129,6 +142,26 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
       setSaving(false);
     }
   };
+
+  const ownerOptions = owners.map((o) => ({
+    value: o._id,
+    label: `${o.cognome} ${o.nome}`,
+    sublabel: `${o.telefono}${o.codiceFiscale ? ` • CF: ${o.codiceFiscale}` : ''}`
+  }));
+
+  const clinicOptions = clinics.map((c) => ({
+    value: c._id,
+    label: c.nome,
+    sublabel: c.citta
+  }));
+
+  const statoOptions = [
+    { value: 'Attivo', label: 'Attivo' },
+    { value: 'Deceduto', label: 'Deceduto 🕊️' },
+    { value: 'Non attivo', label: 'Non attivo' },
+    { value: 'Smarrito', label: 'Smarrito' },
+    { value: 'Adottato', label: 'Adottato' }
+  ];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -150,6 +183,28 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
             {error && (
               <div style={{ padding: '0.75rem', marginBottom: '1rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--rose-50)', color: 'var(--rose-500)', fontSize: '0.85rem' }}>
                 {error}
+              </div>
+            )}
+
+            {formData.stato === 'Deceduto' && (
+              <div
+                style={{
+                  padding: '0.75rem 1rem',
+                  marginBottom: '1rem',
+                  borderRadius: '10px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  color: '#b91c1c',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  fontSize: '0.88rem'
+                }}
+              >
+                <HeartCrack size={18} style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>Attenzione:</strong> Paziente contrassegnato come deceduto. Inserisci la data del decesso per l'archiviazione della cartella clinica.
+                </span>
               </div>
             )}
 
@@ -254,39 +309,72 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
 
             <div className="form-row form-row-2">
               <div className="form-group">
-                <label className="form-label">Proprietario (Cliente) *</label>
-                <select
-                  id="pet-select-proprietario"
-                  className="form-select"
-                  value={formData.proprietarioId}
-                  onChange={(e) => setFormData({ ...formData, proprietarioId: e.target.value })}
-                  required
-                >
-                  <option value="">-- Seleziona Proprietario --</option>
-                  {owners.map((o) => (
-                    <option key={o._id} value={o._id}>
-                      {o.cognome} {o.nome} ({o.telefono})
-                    </option>
-                  ))}
-                </select>
+                <label className="form-label">Stato Paziente</label>
+                <CustomSelect
+                  id="pet-select-stato"
+                  name="stato"
+                  value={formData.stato}
+                  onChange={(e) => setFormData({ ...formData, stato: e.target.value })}
+                  options={statoOptions}
+                />
               </div>
 
+              {formData.stato === 'Deceduto' ? (
+                <div className="form-group">
+                  <label className="form-label" style={{ color: '#b91c1c', fontWeight: 600 }}>
+                    Data del Decesso *
+                  </label>
+                  <input
+                    id="pet-input-datadecesso"
+                    type="date"
+                    className="form-input"
+                    value={formData.dataDecesso}
+                    onChange={(e) => setFormData({ ...formData, dataDecesso: e.target.value })}
+                    required
+                    style={{ borderColor: '#ef4444' }}
+                  />
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label className="form-label">Ambulatorio di Riferimento *</label>
+                  <CustomSelect
+                    id="pet-select-ambulatorio"
+                    name="ambulatorioId"
+                    value={formData.ambulatorioId}
+                    onChange={(e) => setFormData({ ...formData, ambulatorioId: e.target.value })}
+                    options={clinicOptions}
+                    placeholder="Seleziona ambulatorio..."
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="form-row form-row-2">
               <div className="form-group">
-                <label className="form-label">Ambulatorio di Riferimento *</label>
-                <select
-                  id="pet-select-ambulatorio"
-                  className="form-select"
-                  value={formData.ambulatorioId}
-                  onChange={(e) => setFormData({ ...formData, ambulatorioId: e.target.value })}
-                  required
-                >
-                  {clinics.map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.nome} - {c.citta}
-                    </option>
-                  ))}
-                </select>
+                <label className="form-label">Proprietario (Cliente) *</label>
+                <CustomSelect
+                  id="pet-select-proprietario"
+                  name="proprietarioId"
+                  value={formData.proprietarioId}
+                  onChange={(e) => setFormData({ ...formData, proprietarioId: e.target.value })}
+                  options={ownerOptions}
+                  placeholder="Seleziona Proprietario..."
+                />
               </div>
+
+              {formData.stato === 'Deceduto' ? (
+                <div className="form-group">
+                  <label className="form-label">Ambulatorio di Riferimento *</label>
+                  <CustomSelect
+                    id="pet-select-ambulatorio"
+                    name="ambulatorioId"
+                    value={formData.ambulatorioId}
+                    onChange={(e) => setFormData({ ...formData, ambulatorioId: e.target.value })}
+                    options={clinicOptions}
+                    placeholder="Seleziona ambulatorio..."
+                  />
+                </div>
+              ) : null}
             </div>
 
             <div className="form-group">

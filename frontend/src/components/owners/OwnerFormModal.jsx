@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Users } from 'lucide-react';
 import { useClinic } from '../../context/ClinicContext';
 import { api } from '../../services/api';
+import { CustomSelect } from '../common/CustomSelect';
 
 export const OwnerFormModal = ({
   isOpen,
@@ -66,15 +67,26 @@ export const OwnerFormModal = ({
       return;
     }
 
+    const cf = (formData.codiceFiscale || '').trim().toUpperCase();
+    if (!cf || cf.length !== 16 || !/^[A-Z0-9]{16}$/.test(cf)) {
+      setError('Il Codice Fiscale è obbligatorio per il go-live e deve essere di esattamente 16 caratteri alfanumerici.');
+      return;
+    }
+
     try {
       setSaving(true);
       setError('');
 
+      const payload = {
+        ...formData,
+        codiceFiscale: cf
+      };
+
       let result;
       if (initialData?._id) {
-        result = await api.owners.update(initialData._id, formData);
+        result = await api.owners.update(initialData._id, payload);
       } else {
-        result = await api.owners.create(formData);
+        result = await api.owners.create(payload);
       }
 
       if (result.success) {
@@ -87,6 +99,12 @@ export const OwnerFormModal = ({
       setSaving(false);
     }
   };
+
+  const clinicOptions = clinics.map((c) => ({
+    value: c._id,
+    label: c.nome,
+    sublabel: c.citta
+  }));
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -168,32 +186,38 @@ export const OwnerFormModal = ({
 
             <div className="form-row form-row-2">
               <div className="form-group">
-                <label className="form-label">Codice Fiscale</label>
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Codice Fiscale *</span>
+                  <span style={{ fontSize: '0.75rem', color: formData.codiceFiscale?.length === 16 ? 'var(--emerald-600, #059669)' : 'var(--text-muted, #94a3b8)' }}>
+                    {formData.codiceFiscale?.length || 0}/16
+                  </span>
+                </label>
                 <input
                   id="owner-input-cf"
                   type="text"
                   className="form-input"
-                  placeholder="16 caratteri"
+                  placeholder="Es. RSSMRA80A01F205X (16 caratteri)"
                   value={formData.codiceFiscale}
+                  maxLength={16}
                   onChange={(e) => setFormData({ ...formData, codiceFiscale: e.target.value.toUpperCase() })}
+                  required
+                  style={{ textTransform: 'uppercase', letterSpacing: '0.5px', fontFamily: 'monospace' }}
                 />
+                <small style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748b)', marginTop: '2px', display: 'block' }}>
+                  Obbligatorio per il go-live e per fatturazione sanitaria
+                </small>
               </div>
 
               <div className="form-group">
                 <label className="form-label">Ambulatorio di Riferimento *</label>
-                <select
+                <CustomSelect
                   id="owner-select-ambulatorio"
-                  className="form-select"
+                  name="ambulatorioId"
                   value={formData.ambulatorioId}
                   onChange={(e) => setFormData({ ...formData, ambulatorioId: e.target.value })}
-                  required
-                >
-                  {clinics.map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.nome} - {c.citta}
-                    </option>
-                  ))}
-                </select>
+                  options={clinicOptions}
+                  placeholder="Seleziona ambulatorio..."
+                />
               </div>
             </div>
 

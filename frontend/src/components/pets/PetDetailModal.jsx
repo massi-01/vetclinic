@@ -20,11 +20,13 @@ import {
   Syringe,
   Trash2,
   ShieldCheck,
-  Printer
+  Printer,
+  HeartCrack
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { VisitReportModal } from '../visits/VisitReportModal';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 export const PetDetailModal = ({
   isOpen,
@@ -33,7 +35,8 @@ export const PetDetailModal = ({
   onEditPet,
   onNewVisit,
   onNewTherapy,
-  onNewVaccination
+  onNewVaccination,
+  onPetDeleted
 }) => {
   const toast = useToast();
   const [pet, setPet] = useState(null);
@@ -43,6 +46,8 @@ export const PetDetailModal = ({
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('anagrafica'); // 'anagrafica', 'visite', 'terapie', 'peso', 'vaccini', 'audit'
   const [error, setError] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeletingPet, setIsDeletingPet] = useState(false);
 
   const loadPetDetails = async () => {
     if (!petId) return;
@@ -82,6 +87,26 @@ export const PetDetailModal = ({
     }
   };
 
+  const handleDeletePet = async () => {
+    if (!petId) return;
+    try {
+      setIsDeletingPet(true);
+      const res = await api.pets.delete(petId);
+      if (res.success) {
+        toast.success(`Cartella clinica di ${pet?.nome || 'paziente'} eliminata con successo`);
+        setShowDeleteModal(false);
+        onClose();
+        if (onPetDeleted) {
+          onPetDeleted(petId);
+        }
+      }
+    } catch (err) {
+      toast.error(err.message || "Errore durante l'eliminazione del paziente");
+    } finally {
+      setIsDeletingPet(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen && petId) {
       loadPetDetails();
@@ -118,27 +143,48 @@ export const PetDetailModal = ({
               🐾
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <h2 className="modal-title" style={{ fontSize: '1.25rem' }}>{pet?.nome || 'Cartella Clinica'}</h2>
                 <span className="badge badge-status-active">{pet?.specie}</span>
+                {pet?.stato === 'Deceduto' && (
+                  <span className="badge" style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}>
+                    Deceduto 🕊️
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--slate-500)' }}>
                 {pet?.razza} • {pet?.sesso} {pet?.microchip && `• Chip: ${pet.microchip}`}
+                {pet?.stato === 'Deceduto' && pet?.dataDecesso && (
+                  <span style={{ color: '#b91c1c', marginLeft: '0.5rem' }}>
+                    (Deceduto il {new Date(pet.dataDecesso).toLocaleDateString('it-IT')})
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             {pet && (
-              <button
-                id="btn-edit-pet-details"
-                className="btn btn-sm btn-secondary"
-                onClick={() => {
-                  onEditPet(pet);
-                }}
-              >
-                <Edit2 size={14} /> Modifica
-              </button>
+              <>
+                <button
+                  id="btn-edit-pet-details"
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => {
+                    onEditPet(pet);
+                  }}
+                >
+                  <Edit2 size={14} /> Modifica
+                </button>
+                <button
+                  id="btn-delete-pet-details"
+                  className="btn btn-sm btn-secondary"
+                  style={{ color: '#ef4444' }}
+                  onClick={() => setShowDeleteModal(true)}
+                  title="Elimina Paziente"
+                >
+                  <Trash2 size={14} /> Elimina
+                </button>
+              </>
             )}
             <button className="btn btn-icon btn-secondary" onClick={onClose}>
               <X size={18} />
@@ -215,6 +261,32 @@ export const PetDetailModal = ({
               {/* TAB 1: Anagrafica & Proprietario */}
               {activeTab === 'anagrafica' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {pet?.stato === 'Deceduto' && (
+                    <div
+                      style={{
+                        padding: '1rem',
+                        backgroundColor: '#fef2f2',
+                        border: '1px solid #fecaca',
+                        borderRadius: 'var(--radius-lg)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        color: '#991b1b'
+                      }}
+                    >
+                      <HeartCrack size={24} style={{ flexShrink: 0 }} />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                          Paziente Deceduto 🕊️
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: '#b91c1c', marginTop: '2px' }}>
+                          Data decesso: {pet.dataDecesso ? new Date(pet.dataDecesso).toLocaleDateString('it-IT') : 'Non specificata'}
+                          . La cartella clinica è archiviata a fini storico-sanitari e legali.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Proprietario Box */}
                   <div
                     style={{
@@ -754,6 +826,25 @@ export const PetDetailModal = ({
           onClose={() => setSelectedVisitForReport(null)}
           visit={selectedVisitForReport}
           pet={pet}
+        />
+
+        {/* Modale di Conferma Eliminazione Cartella Paziente */}
+        <ConfirmModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={handleDeletePet}
+          title="Elimina Cartella Clinica Paziente"
+          message={
+            <span>
+              Sei sicuro di voler eliminare la scheda clinica di <strong>{pet?.nome}</strong>?
+              <br />
+              Verranno eliminate tutte le visite, prescrizioni e registrazioni sanitarie collegate in modo irreversibile.
+            </span>
+          }
+          confirmText="Elimina Cartella"
+          cancelText="Annulla"
+          type="danger"
+          isLoading={isDeletingPet}
         />
       </div>
     </div>

@@ -13,18 +13,24 @@ import {
   FileText,
   Pill,
   Activity,
-  AlertCircle
+  AlertCircle,
+  FlaskConical,
+  Download,
+  Paperclip,
+  CheckCircle2
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useClinic } from '../../context/ClinicContext';
 import { useAuth } from '../../context/AuthContext';
 import { LoadingSpinner } from '../common/LoadingSpinner';
+import { generateMergedVisitPdf } from '../../services/pdfReportGenerator';
 
 export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId, pet: defaultPet }) => {
   const { activeClinic } = useClinic();
   const { user } = useAuth();
   const [visit, setVisit] = useState(initialVisit || null);
   const [loading, setLoading] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -380,6 +386,45 @@ export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId
     printWindow.document.close();
   };
 
+  const hasAttachedPdfs = (visit?.esami || []).some((e) => Boolean(e.fileAllegato));
+
+  const handleDownloadMergedPdf = async () => {
+    try {
+      setIsGeneratingPdf(true);
+      const pdfBytes = await generateMergedVisitPdf({
+        visit,
+        clinic,
+        pet,
+        owner,
+        vet: visit.veterinarioId || user
+      });
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Referto_${(pet?.nome || 'Paziente').replace(/\s+/g, '_')}_${protocolNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      console.error('Errore nella generazione del PDF con allegati:', err);
+      alert('Si è verificato un errore durante la generazione del fascicolo PDF: ' + err.message);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const downloadAttachment = (esame) => {
+    if (!esame.fileAllegato) return;
+    const link = document.createElement('a');
+    link.href = esame.fileAllegato;
+    link.download = esame.nomeFile || `esame_${esame.nome || 'allegato'}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1100 }}>
       <div
@@ -436,13 +481,30 @@ export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <button
-              id="btn-print-visit-direct"
+              id="btn-download-merged-pdf"
               className="btn btn-primary"
-              onClick={handlePrint}
+              onClick={handleDownloadMergedPdf}
+              disabled={isGeneratingPdf}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.55rem 1.1rem' }}
             >
+              <Download size={16} />
+              <span>
+                {isGeneratingPdf
+                  ? 'Generazione in corso...'
+                  : hasAttachedPdfs
+                  ? 'Scarica Fascicolo PDF (con Allegati)'
+                  : 'Scarica Referto PDF'}
+              </span>
+            </button>
+
+            <button
+              id="btn-print-visit-direct"
+              className="btn btn-secondary"
+              onClick={handlePrint}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.55rem 0.9rem' }}
+            >
               <Printer size={16} />
-              <span>Stampa / Salva in PDF</span>
+              <span>Stampa</span>
             </button>
 
             <button
@@ -713,6 +775,91 @@ export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId
                   {visit.diagnosi || 'Esame nella norma, nessun reperto patologico rilevato al momento della visita.'}
                 </div>
               </div>
+
+              {/* Esami & Prestazioni Specialistiche */}
+              {Array.isArray(visit.esami) && visit.esami.length > 0 && (
+                <div className="report-section">
+                  <div className="report-section-title">
+                    <FlaskConical size={14} /> Esami di Laboratorio & Indagini Diagnostiche
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {visit.esami.map((esame, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          background: '#f8fafc',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          padding: '8px 12px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '6px' }}>
+                          <div>
+                            <span style={{ fontWeight: 700, fontSize: '9pt', color: 'var(--slate-900)' }}>
+                              {esame.nome || 'Esame specialistico'}
+                            </span>
+                            <span
+                              style={{
+                                marginLeft: '8px',
+                                fontSize: '7.8pt',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                background: esame.tipologia === 'Esterno' ? '#fef3c7' : '#e0f2fe',
+                                color: esame.tipologia === 'Esterno' ? '#92400e' : '#0369a1',
+                                fontWeight: 600
+                              }}
+                            >
+                              {esame.tipologia || 'Interno'}
+                              {esame.tipologia === 'Esterno' && esame.laboratorio ? ` • Lab: ${esame.laboratorio}` : ''}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span
+                              style={{
+                                fontSize: '7.8pt',
+                                fontWeight: 700,
+                                color: esame.stato === 'In lavorazione' ? '#d97706' : '#0d9488'
+                              }}
+                            >
+                              {esame.stato === 'In lavorazione' ? '⏳ In lavorazione' : '✅ Pronto'}
+                            </span>
+                            {esame.fileAllegato && (
+                              <button
+                                type="button"
+                                className="no-print btn btn-sm btn-secondary"
+                                onClick={() => downloadAttachment(esame)}
+                                style={{
+                                  fontSize: '7.5pt',
+                                  padding: '2px 6px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Scarica il PDF referto del laboratorio"
+                              >
+                                <Download size={12} /> Scarica PDF Esame
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {esame.esito && (
+                          <div style={{ fontSize: '8.4pt', color: '#334155', marginTop: '4px' }}>
+                            <strong>Esito:</strong> {esame.esito}
+                          </div>
+                        )}
+
+                        {esame.fileAllegato && (
+                          <div style={{ fontSize: '7.8pt', color: '#0d9488', fontStyle: 'italic', marginTop: '3px' }}>
+                            📎 Referto laboratorio originale ({esame.nomeFile || 'allegato.pdf'}) unito al fascicolo PDF.
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Terapie & Prescrizioni Farmacologiche */}
               {therapies.length > 0 && (

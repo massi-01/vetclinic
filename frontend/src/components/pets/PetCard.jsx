@@ -62,12 +62,22 @@ export const PetCard = ({ pet, onSelect, onNewVisit }) => {
             )}
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: 'var(--slate-900)' }}>{pet.nome}</h3>
               <span className={`badge ${badgeInfo.className}`}>{badgeInfo.label}</span>
+              {pet.stato === 'Deceduto' && (
+                <span className="badge" style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}>
+                  Deceduto 🕊️
+                </span>
+              )}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--slate-500)', fontWeight: '500' }}>
               {pet.razza} • {pet.sesso}
+              {pet.stato === 'Deceduto' && pet.dataDecesso && (
+                <span style={{ color: '#b91c1c', marginLeft: '0.5rem' }}>
+                  (Deceduto il {new Date(pet.dataDecesso).toLocaleDateString('it-IT')})
+                </span>
+              )}
             </div>
           </div>
         </div>

@@ -107,7 +107,9 @@ export const createPet = async (req, res) => {
       noteCliniche,
       proprietarioId,
       ambulatorioId,
-      fotoUrl
+      fotoUrl,
+      stato,
+      dataDecesso
     } = req.body;
 
     if (!nome || !specie || !proprietarioId || !ambulatorioId) {
@@ -139,7 +141,9 @@ export const createPet = async (req, res) => {
       noteCliniche,
       proprietarioId,
       ambulatorioId,
-      fotoUrl
+      fotoUrl,
+      stato: stato || 'Attivo',
+      dataDecesso: (stato === 'Deceduto' && dataDecesso) ? dataDecesso : null
     });
 
     res.status(201).json({

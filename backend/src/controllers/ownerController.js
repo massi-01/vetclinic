@@ -58,10 +58,18 @@ export const createOwner = async (req, res) => {
   try {
     const { nome, cognome, codiceFiscale, telefono, email, indirizzo, citta, note, ambulatorioId } = req.body;
 
-    if (!nome || !cognome || !telefono || !ambulatorioId) {
+    if (!nome || !cognome || !telefono || !ambulatorioId || !codiceFiscale) {
       return res.status(400).json({
         success: false,
-        message: 'Nome, cognome, telefono e ambulatorio sono obbligatori'
+        message: 'Nome, cognome, codice fiscale, telefono e ambulatorio sono obbligatori'
+      });
+    }
+
+    const cleanCf = codiceFiscale.trim().toUpperCase();
+    if (cleanCf.length !== 16) {
+      return res.status(400).json({
+        success: false,
+        message: 'Il codice fiscale deve essere composto da 16 caratteri alfanumerici'
       });
     }
 
@@ -76,7 +84,7 @@ export const createOwner = async (req, res) => {
     const owner = await dataStore.createOwner({
       nome,
       cognome,
-      codiceFiscale,
+      codiceFiscale: cleanCf,
       telefono,
       email,
       indirizzo,
@@ -115,6 +123,17 @@ export const updateOwner = async (req, res) => {
         success: false,
         message: 'Non sei autorizzato a modificare questo cliente'
       });
+    }
+
+    if (req.body.codiceFiscale !== undefined) {
+      const cleanCf = req.body.codiceFiscale.trim().toUpperCase();
+      if (!cleanCf || cleanCf.length !== 16) {
+        return res.status(400).json({
+          success: false,
+          message: 'Il codice fiscale è obbligatorio e deve essere composto da 16 caratteri'
+        });
+      }
+      req.body.codiceFiscale = cleanCf;
     }
 
     const owner = await dataStore.updateOwner(req.params.id, req.body);

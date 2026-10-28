@@ -82,6 +82,9 @@ const petSchema = new mongoose.Schema(
       type: String,
       enum: ['Attivo', 'Deceduto', 'Trasferito'],
       default: 'Attivo'
+    },
+    dataDecesso: {
+      type: Date
     }
   },
   {

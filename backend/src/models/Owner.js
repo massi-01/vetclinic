@@ -14,6 +14,7 @@ const ownerSchema = new mongoose.Schema(
     },
     codiceFiscale: {
       type: String,
+      required: [true, 'Il codice fiscale del cliente è obbligatorio'],
       trim: true,
       uppercase: true
     },

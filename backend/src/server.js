@@ -100,9 +100,9 @@ app.use(
   })
 );
 
-// Limite dimensione payload JSON configurato a 5MB per supportare avatar e foto cliniche
-app.use(express.json({ limit: '5mb' }));
-app.use(express.urlencoded({ limit: '5mb', extended: true }));
+// Limite dimensione payload configurato a 15MB per supportare allegati PDF referti, esami diagnostici e foto cliniche
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
 // Logging strutturato di tutte le richieste HTTP (Observability)
 app.use(requestLogger);

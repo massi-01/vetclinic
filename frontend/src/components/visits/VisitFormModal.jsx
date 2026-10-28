@@ -1,7 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { X, ClipboardList, Stethoscope, Pill, HeartPulse, Calendar, Printer } from 'lucide-react';
+import {
+  X,
+  ClipboardList,
+  Stethoscope,
+  Pill,
+  HeartPulse,
+  Calendar,
+  Printer,
+  FlaskConical,
+  Paperclip,
+  Upload,
+  Trash2,
+  CheckCircle2,
+  AlertCircle,
+  FileText,
+  UserCheck
+} from 'lucide-react';
 import { useClinic } from '../../context/ClinicContext';
+import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
+import { CustomSelect } from '../common/CustomSelect';
 import { VisitReportModal } from './VisitReportModal';
 
 // Arrotonda l'orario alla mezz'ora più vicina (:00 o :30)
@@ -46,6 +64,7 @@ export const VisitFormModal = ({
   initialData = null
 }) => {
   const { activeClinic, clinics } = useClinic();
+  const { user } = useAuth();
   const [pets, setPets] = useState([]);
   const [loadingPets, setLoadingPets] = useState(false);
   const [includeTherapy, setIncludeTherapy] = useState(false);
@@ -54,6 +73,7 @@ export const VisitFormModal = ({
   const [formData, setFormData] = useState({
     animaleId: defaultPet?._id || '',
     ambulatorioId: defaultPet?.ambulatorioId?._id || defaultPet?.ambulatorioId || activeClinic?._id || (clinics[0]?._id || ''),
+    veterinarioId: user?._id || '',
     data: new Date().toISOString().split('T')[0],
     ora: roundTimeToHalfHour(),
     tipoVisita: 'Controllo Generale',
@@ -67,6 +87,7 @@ export const VisitFormModal = ({
     pesoRilevato: defaultPet?.pesoAttuale || '',
     note: '',
     stato: 'Completata',
+    esami: [],
     // Dati per terapia contestuale opzionale
     farmacoNome: '',
     farmacoPrincipio: '',
@@ -87,6 +108,7 @@ export const VisitFormModal = ({
         setFormData({
           animaleId: initialData.animaleId?._id || initialData.animaleId || '',
           ambulatorioId: initialData.ambulatorioId?._id || initialData.ambulatorioId || activeClinic?._id || clinics[0]?._id || '',
+          veterinarioId: initialData.veterinarioId?._id || initialData.veterinarioId || user?._id || '',
           data: initialData.data ? initialData.data.split('T')[0] : new Date().toISOString().split('T')[0],
           ora: roundTimeToHalfHour(initialData.ora || '10:00'),
           tipoVisita: initialData.tipoVisita || 'Controllo Generale',
@@ -100,6 +122,7 @@ export const VisitFormModal = ({
           pesoRilevato: initialData.parametriVitali?.pesoRilevato || '',
           note: initialData.note || '',
           stato: initialData.stato || 'Completata',
+          esami: Array.isArray(initialData.esami) ? initialData.esami : [],
           farmacoNome: '',
           farmacoPrincipio: '',
           farmacoDosaggio: '',
@@ -114,6 +137,7 @@ export const VisitFormModal = ({
           ...prev,
           animaleId: defaultPet?._id || prev.animaleId || '',
           ambulatorioId: defaultPet?.ambulatorioId?._id || defaultPet?.ambulatorioId || activeClinic?._id || clinics[0]?._id || '',
+          veterinarioId: user?._id || prev.veterinarioId || '',
           data: new Date().toISOString().split('T')[0],
           ora: roundTimeToHalfHour(),
           pesoRilevato: defaultPet?.pesoAttuale || '',
@@ -121,13 +145,97 @@ export const VisitFormModal = ({
           anamnesi: '',
           esameObiettivo: '',
           diagnosi: '',
-          note: ''
+          note: '',
+          esami: []
         }));
         setIncludeTherapy(false);
       }
       setError('');
     }
-  }, [isOpen, defaultPet, initialData, activeClinic]);
+  }, [isOpen, defaultPet, initialData, activeClinic, user]);
+
+  const handleAddExam = () => {
+    setFormData((prev) => ({
+      ...prev,
+      esami: [
+        ...(prev.esami || []),
+        {
+          nome: '',
+          tipologia: 'Interno',
+          laboratorio: '',
+          stato: 'In lavorazione',
+          dataRichiesta: new Date().toISOString().split('T')[0],
+          dataReferto: '',
+          esito: '',
+          fileAllegato: '',
+          nomeFile: '',
+          tipoFile: '',
+          dimensioneFile: 0
+        }
+      ]
+    }));
+  };
+
+  const handleUpdateExam = (index, field, value) => {
+    setFormData((prev) => {
+      const next = [...prev.esami];
+      next[index] = { ...next[index], [field]: value };
+      return { ...prev, esami: next };
+    });
+  };
+
+  const handleRemoveExam = (index) => {
+    setFormData((prev) => {
+      const next = prev.esami.filter((_, i) => i !== index);
+      return { ...prev, esami: next };
+    });
+  };
+
+  const handleExamFileUpload = (index, e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      setError('È consentito allegare esclusivamente referti in formato PDF');
+      return;
+    }
+
+    if (file.size > 12 * 1024 * 1024) {
+      setError('Il file PDF dell\'esame non può superare la dimensione di 12 MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFormData((prev) => {
+        const next = [...prev.esami];
+        next[index] = {
+          ...next[index],
+          fileAllegato: reader.result,
+          nomeFile: file.name,
+          tipoFile: file.type,
+          dimensioneFile: file.size,
+          stato: next[index].tipologia === 'Esterno' ? 'Pronto' : next[index].stato
+        };
+        return { ...prev, esami: next };
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveExamFile = (index) => {
+    setFormData((prev) => {
+      const next = [...prev.esami];
+      next[index] = {
+        ...next[index],
+        fileAllegato: '',
+        nomeFile: '',
+        tipoFile: '',
+        dimensioneFile: 0
+      };
+      return { ...prev, esami: next };
+    });
+  };
 
   const loadPets = async () => {
     try {
@@ -170,6 +278,7 @@ export const VisitFormModal = ({
       const payload = {
         animaleId: formData.animaleId,
         ambulatorioId: formData.ambulatorioId,
+        veterinarioId: formData.veterinarioId || user?._id,
         data: formData.data,
         ora: roundTimeToHalfHour(formData.ora),
         tipoVisita: formData.tipoVisita,
@@ -177,6 +286,7 @@ export const VisitFormModal = ({
         anamnesi: formData.anamnesi,
         esameObiettivo: formData.esameObiettivo,
         diagnosi: formData.diagnosi,
+        esami: formData.esami || [],
         parametriVitali: {
           temperatura: formData.temperatura ? Number(formData.temperatura) : undefined,
           frequenzaCardiaca: formData.frequenzaCardiaca ? Number(formData.frequenzaCardiaca) : undefined,
@@ -217,9 +327,33 @@ export const VisitFormModal = ({
     }
   };
 
+  const petOptions = pets.map((p) => ({
+    value: p._id,
+    label: p.nome,
+    sublabel: `${p.specie} • ${p.razza || 'Meticcio'} (Prop: ${p.proprietarioId?.cognome || 'N/D'})`
+  }));
+
+  const clinicOptions = clinics.map((c) => ({
+    value: c._id,
+    label: c.nome,
+    sublabel: c.citta
+  }));
+
+  const selectedClinic = clinics.find((c) => c._id === formData.ambulatorioId) || activeClinic;
+  const clinicVets = selectedClinic?.veterinari || [];
+  const allVets = [...clinicVets];
+  if (user && !allVets.some((v) => (v._id || v) === user._id)) {
+    allVets.unshift(user);
+  }
+  const vetOptions = allVets.map((v) => ({
+    value: v._id || v,
+    label: `Dr. ${v.nome || ''} ${v.cognome || ''}`.trim() || 'Medico Veterinario',
+    sublabel: v.codiceAlbo ? `Albo: ${v.codiceAlbo}` : (v.email || '')
+  }));
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '680px' }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px' }}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -240,13 +374,13 @@ export const VisitFormModal = ({
               </div>
             )}
 
-            {/* Paziente e Clinica */}
+            {/* Paziente e Medico Esecutore */}
             <div className="form-row form-row-2">
               <div className="form-group">
                 <label className="form-label">Paziente (Animale) *</label>
-                <select
+                <CustomSelect
                   id="visit-select-pet"
-                  className="form-select"
+                  name="animaleId"
                   value={formData.animaleId}
                   onChange={(e) => {
                     const sel = pets.find((p) => p._id === e.target.value);
@@ -256,15 +390,36 @@ export const VisitFormModal = ({
                       pesoRilevato: sel?.pesoAttuale || formData.pesoRilevato
                     });
                   }}
-                  required
-                >
-                  <option value="">-- Seleziona Paziente --</option>
-                  {pets.map((p) => (
-                    <option key={p._id} value={p._id}>
-                      {p.nome} ({p.specie} - {p.razza}) - Prop: {p.proprietarioId?.cognome || ''}
-                    </option>
-                  ))}
-                </select>
+                  options={petOptions}
+                  placeholder="Seleziona paziente..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Medico Veterinario Esecutore *</label>
+                <CustomSelect
+                  id="visit-select-veterinario"
+                  name="veterinarioId"
+                  value={formData.veterinarioId}
+                  onChange={(e) => setFormData({ ...formData, veterinarioId: e.target.value })}
+                  options={vetOptions}
+                  placeholder="Seleziona medico veterinario..."
+                />
+              </div>
+            </div>
+
+            {/* Ambulatorio e Tipo Visita */}
+            <div className="form-row form-row-2">
+              <div className="form-group">
+                <label className="form-label">Ambulatorio di Riferimento *</label>
+                <CustomSelect
+                  id="visit-select-ambulatorio"
+                  name="ambulatorioId"
+                  value={formData.ambulatorioId}
+                  onChange={(e) => setFormData({ ...formData, ambulatorioId: e.target.value })}
+                  options={clinicOptions}
+                  placeholder="Seleziona ambulatorio..."
+                />
               </div>
 
               <div className="form-group">
@@ -438,6 +593,202 @@ export const VisitFormModal = ({
                 value={formData.diagnosi}
                 onChange={(e) => setFormData({ ...formData, diagnosi: e.target.value })}
               />
+            </div>
+
+            {/* Sezione Esami & Diagnostica Specialistica */}
+            <div style={{ marginTop: '1.25rem', marginBottom: '1.25rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <FlaskConical size={18} color="var(--primary)" />
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--slate-800)' }}>
+                    Esami, Test & Indagini Specialistiche ({formData.esami?.length || 0})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  id="btn-add-exam"
+                  className="btn btn-sm btn-secondary"
+                  onClick={handleAddExam}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--primary)', fontWeight: 600 }}
+                >
+                  <FlaskConical size={14} /> + Aggiungi Esame
+                </button>
+              </div>
+
+              {formData.esami && formData.esami.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  {formData.esami.map((esame, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '10px',
+                        padding: '1rem',
+                        position: 'relative'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase' }}>
+                          Esame #{idx + 1}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-secondary"
+                          style={{ color: '#ef4444', padding: '2px 8px' }}
+                          onClick={() => handleRemoveExam(idx)}
+                          title="Rimuovi esame"
+                        >
+                          <Trash2 size={13} /> Rimuovi
+                        </button>
+                      </div>
+
+                      <div className="form-row form-row-2">
+                        <div className="form-group">
+                          <label className="form-label">Nome Prestazione / Esame *</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Es. Emocromo, Biochimico, Radiografia torace..."
+                            value={esame.nome}
+                            onChange={(e) => handleUpdateExam(idx, 'nome', e.target.value)}
+                            required
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">Tipologia Esame *</label>
+                          <select
+                            className="form-select"
+                            value={esame.tipologia}
+                            onChange={(e) => handleUpdateExam(idx, 'tipologia', e.target.value)}
+                          >
+                            <option value="Interno">Interno (Ambulatorio)</option>
+                            <option value="Esterno">Esterno (Laboratorio)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {esame.tipologia === 'Esterno' && (
+                        <div className="form-row form-row-2" style={{ backgroundColor: '#ffffff', padding: '0.75rem', borderRadius: '8px', border: '1px dashed #cbd5e1', marginBottom: '0.75rem' }}>
+                          <div className="form-group">
+                            <label className="form-label" style={{ color: 'var(--primary)' }}>
+                              Nome Laboratorio Esterno *
+                            </label>
+                            <input
+                              type="text"
+                              className="form-input"
+                              placeholder="Es. IDEXX Laboratories, Lab San Marco, CDVet..."
+                              value={esame.laboratorio || ''}
+                              onChange={(e) => handleUpdateExam(idx, 'laboratorio', e.target.value)}
+                              required={esame.tipologia === 'Esterno'}
+                            />
+                          </div>
+
+                          <div className="form-group">
+                            <label className="form-label" style={{ color: 'var(--primary)' }}>
+                              Stato Lavorazione *
+                            </label>
+                            <select
+                              className="form-select"
+                              value={esame.stato || 'In lavorazione'}
+                              onChange={(e) => handleUpdateExam(idx, 'stato', e.target.value)}
+                            >
+                              <option value="In lavorazione">⏳ In lavorazione (Inviato)</option>
+                              <option value="Pronto">✅ Pronto / Refertato</option>
+                            </select>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="form-row form-row-2">
+                        <div className="form-group">
+                          <label className="form-label">Esito / Note Referto</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Es. Valori nella norma, lieve leucocitosi..."
+                            value={esame.esito || ''}
+                            onChange={(e) => handleUpdateExam(idx, 'esito', e.target.value)}
+                          />
+                        </div>
+
+                        {/* File Upload PDF */}
+                        <div className="form-group">
+                          <label className="form-label">Referto PDF Allegato</label>
+                          {esame.fileAllegato ? (
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: '#f0fdfa',
+                                border: '1px solid #99f6e4',
+                                padding: '0.45rem 0.75rem',
+                                borderRadius: '8px',
+                                fontSize: '0.82rem'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0f766e', overflow: 'hidden' }}>
+                                <Paperclip size={14} style={{ flexShrink: 0 }} />
+                                <span style={{ fontWeight: 600, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                  {esame.nomeFile || 'referto.pdf'}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveExamFile(idx)}
+                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px' }}
+                                title="Rimuovi file allegato"
+                              >
+                                <X size={15} />
+                              </button>
+                            </div>
+                          ) : (
+                            <label
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.4rem',
+                                padding: '0.5rem 0.75rem',
+                                background: '#ffffff',
+                                border: '1px dashed #cbd5e1',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '0.82rem',
+                                color: 'var(--slate-600)'
+                              }}
+                            >
+                              <Upload size={14} color="var(--primary)" />
+                              <span>Allega PDF Referto (max 12MB)</span>
+                              <input
+                                type="file"
+                                accept="application/pdf"
+                                style={{ display: 'none' }}
+                                onChange={(e) => handleExamFileUpload(idx, e)}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    padding: '1rem',
+                    textAlign: 'center',
+                    border: '1px dashed #cbd5e1',
+                    borderRadius: '8px',
+                    color: 'var(--slate-400)',
+                    fontSize: '0.84rem'
+                  }}
+                >
+                  Nessun esame o indagine registrata. Clicca su "+ Aggiungi Esame" per inserire esami interni o inviati a laboratorio.
+                </div>
+              )}
             </div>
 
             {/* Toggle Terapia Contestuale */}

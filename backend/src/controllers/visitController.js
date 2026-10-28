@@ -2,8 +2,8 @@ import { dataStore } from '../services/dataStore.js';
 
 export const getVisits = async (req, res) => {
   try {
-    const { clinicId, petId, data, limit } = req.query;
-    const visits = await dataStore.getVisits(clinicId, { petId, data, limit }, req.user?._id);
+    const { clinicId, petId, data, limit, veterinarioId } = req.query;
+    const visits = await dataStore.getVisits(clinicId, { petId, data, limit, veterinarioId }, req.user?._id);
     res.json({
       success: true,
       data: visits
@@ -78,6 +78,8 @@ export const createVisit = async (req, res) => {
       stato,
       animaleId,
       ambulatorioId,
+      veterinarioId,
+      esami,
       terapia // opzionale: farmaco prescritto contestualmente alla visita
     } = req.body;
 
@@ -96,6 +98,15 @@ export const createVisit = async (req, res) => {
       });
     }
 
+    // Determina il medico esecutore della visita (veterinarioId)
+    let assignedVetId = req.user._id;
+    if (veterinarioId) {
+      const isVetValid = await dataStore.isUserAuthorizedForClinic(veterinarioId, ambulatorioId);
+      if (isVetValid) {
+        assignedVetId = veterinarioId;
+      }
+    }
+
     const visit = await dataStore.createVisit({
       data: data || new Date().toISOString().split('T')[0],
       ora: ora || '10:00',
@@ -108,8 +119,9 @@ export const createVisit = async (req, res) => {
       note: note || '',
       stato: stato || 'Completata',
       animaleId,
-      veterinarioId: req.user._id,
-      ambulatorioId
+      veterinarioId: assignedVetId,
+      ambulatorioId,
+      esami: Array.isArray(esami) ? esami : []
     });
 
     // Se è stata allegata una prescrizione terapeutica contestuale, creiamola
@@ -127,7 +139,7 @@ export const createVisit = async (req, res) => {
         attiva: true,
         animaleId,
         visitaId: visit._id,
-        veterinarioId: req.user._id,
+        veterinarioId: assignedVetId,
         ambulatorioId
       });
     }

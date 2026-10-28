@@ -1233,12 +1233,13 @@ export const dataStore = {
     const clinicIds = await this.resolveClinicFilter(clinicId, vetId);
     if (clinicIds !== null && clinicIds.length === 0) return [];
 
-    const { petId, data, limit } = filters;
+    const { petId, data, limit, veterinarioId } = filters;
     if (shouldUseMongo()) {
       const query = {};
       if (clinicIds) query.ambulatorioId = { $in: clinicIds };
       if (petId) query.animaleId = petId;
       if (data) query.data = data;
+      if (veterinarioId) query.veterinarioId = veterinarioId;
       let q = Visit.find(query)
         .populate({ path: 'animaleId', populate: { path: 'proprietarioId' } })
         .populate('veterinarioId', 'nome cognome email telefono codiceAlbo ruolo')
@@ -1258,6 +1259,9 @@ export const dataStore = {
     }
     if (data) {
       list = list.filter((v) => v.data === data);
+    }
+    if (veterinarioId) {
+      list = list.filter((v) => (v.veterinarioId?._id || v.veterinarioId)?.toString() === veterinarioId.toString());
     }
     list.sort((a, b) => new Date(b.data) - new Date(a.data));
     if (limit) list = list.slice(0, Number(limit));
