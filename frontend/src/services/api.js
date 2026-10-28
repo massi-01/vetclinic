@@ -38,10 +38,11 @@ export const request = async (endpoint, options = {}) => {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    if (response.status === 401) {
-      // Se non autorizzato o token scaduto, pulisci token e reindirizza se opportuno
+    if (response.status === 401 && !endpoint.startsWith('/auth/login') && !endpoint.startsWith('/auth/register')) {
+      // Se non autorizzato o token scaduto su rotta protetta, pulisci token e notifica AuthContext
       localStorage.removeItem('vet_token');
       localStorage.removeItem('vet_user');
+      window.dispatchEvent(new CustomEvent('auth:unauthorized', { detail: { message: data.message } }));
     }
     const error = new Error(data.message || 'Errore nella richiesta di rete');
     error.status = response.status;

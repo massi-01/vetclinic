@@ -235,6 +235,16 @@ if (process.env.DISABLE_SWAGGER !== 'true') {
   app.use('/api-docs-raw', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 }
 
+// Middleware di resilienza database per serverless e container idle
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState !== 1 && process.env.MONGODB_URI) {
+    await connectDB().catch((err) => {
+      logger.error('Errore durante la riconnessione al database:', err.message);
+    });
+  }
+  next();
+});
+
 // Registrazione rotte API
 app.use('/api/auth', authRoutes);
 app.use('/api/clinics', clinicRoutes);

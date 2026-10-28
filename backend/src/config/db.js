@@ -18,31 +18,43 @@ export const connectDB = async () => {
     return false;
   }
 
-  // Se già connesso (fondamentale per riuso istanze in serverless/Vercel)
-  if (mongoose.connection.readyState >= 1) {
+  // 1. Se già connesso attivamente
+  if (mongoose.connection.readyState === 1) {
     isMongoConnected = true;
     return true;
   }
 
+  // 2. Se disconnesso o interrotto (readyState 0 o 3), resetta la promise memorizzata
+  if (mongoose.connection.readyState === 0 || mongoose.connection.readyState === 3) {
+    cachedPromise = null;
+  }
+
+  // 3. Se c'è una promise di connessione in corso, attendila
   if (cachedPromise) {
     try {
       await cachedPromise;
-      isMongoConnected = mongoose.connection.readyState >= 1;
-      return isMongoConnected;
+      if (mongoose.connection.readyState === 1) {
+        isMongoConnected = true;
+        return true;
+      }
     } catch {
       cachedPromise = null;
     }
   }
 
+  // 4. Avvia una nuova connessione a MongoDB
   try {
     cachedPromise = mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 5000
+      serverSelectionTimeoutMS: 5000,
+      maxPoolSize: 10,
+      socketTimeoutMS: 45000
     });
     await cachedPromise;
     isMongoConnected = true;
     console.log('✅ Connesso con successo a MongoDB:', mongoose.connection.host);
     return true;
   } catch (error) {
+    cachedPromise = null;
     if (isProduction && process.env.VERCEL !== '1') {
       console.error('❌ [FATAL]: Impossibile connettersi a MongoDB in ambiente di produzione:', error.message);
       console.error('🛑 Arresto del server per evitare corruzione o perdita di dati (Fail-Fast).');
