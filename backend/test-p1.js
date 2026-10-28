@@ -506,6 +506,48 @@ async function runTests() {
   assert(mockJsonData.data.every(v => (v.veterinarioId?._id || v.veterinarioId)?.toString() === fakeVet._id.toString()), 'Tutte le visite devono appartenere al medico filtrato');
   console.log('   ✅ Medico esecutore e filtro visite per medico verificati con successo.\n');
 
+  // Test 15: Verifica Rimozione Allegato PDF da Esame (removeExamAttachment)
+  console.log('15. Verifica Rimozione Allegato PDF da Esame (removeExamAttachment)...');
+  const { removeExamAttachment } = await import('./src/controllers/visitController.js');
+
+  const createdVisitWithExam = await dataStore.createVisit({
+    data: '2026-11-27',
+    ora: '16:00',
+    tipoVisita: 'Controllo Specialistico',
+    motivo: 'Verifica rimozione allegato',
+    animaleId: 'pet-123',
+    ambulatorioId: clinic1._id,
+    veterinarioId: fakeVet._id,
+    esami: [
+      {
+        nome: 'Esame Citologico',
+        tipologia: 'Interno',
+        stato: 'Pronto',
+        esito: 'Negativo',
+        fileAllegato: 'data:application/pdf;base64,SAMPLEPDF...',
+        nomeFile: 'citologia.pdf',
+        dimensioneFile: 2048
+      }
+    ]
+  });
+
+  assert(createdVisitWithExam.esami[0].fileAllegato, 'L\'esame deve avere inizialmente un file allegato');
+
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await removeExamAttachment({
+    user: { _id: fakeVet._id },
+    params: {
+      id: createdVisitWithExam._id.toString(),
+      examId: (createdVisitWithExam.esami[0]._id || 0).toString()
+    }
+  }, mockRes);
+
+  assert.strictEqual(mockStatusCode, 200, 'Rimozione allegato deve restituire status 200');
+  assert(!mockJsonData.data.esami[0].fileAllegato, 'fileAllegato deve essere vuoto o nullo');
+  assert(!mockJsonData.data.esami[0].nomeFile, 'nomeFile deve essere vuoto o nullo');
+  console.log('   ✅ Rimozione allegato PDF da esame verificata con successo.\n');
+
   console.log('🎉 TUTTI I TEST P1, P2 E NUOVE FUNZIONALITÀ SONO STATI SUPERATI CON SUCCESSO!');
 }
 

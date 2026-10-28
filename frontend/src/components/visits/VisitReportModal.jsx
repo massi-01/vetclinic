@@ -17,21 +17,27 @@ import {
   FlaskConical,
   Download,
   Paperclip,
-  CheckCircle2
+  CheckCircle2,
+  Trash2
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useClinic } from '../../context/ClinicContext';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { LoadingSpinner } from '../common/LoadingSpinner';
+import { ConfirmModal } from '../common/ConfirmModal';
 import { generateMergedVisitPdf } from '../../services/pdfReportGenerator';
 
-export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId, pet: defaultPet }) => {
+export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId, pet: defaultPet, onVisitUpdated }) => {
   const { activeClinic } = useClinic();
   const { user } = useAuth();
+  const toast = useToast();
   const [visit, setVisit] = useState(initialVisit || null);
   const [loading, setLoading] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [error, setError] = useState('');
+  const [attachmentToDelete, setAttachmentToDelete] = useState(null);
+  const [isRemovingAttachment, setIsRemovingAttachment] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -423,6 +429,76 @@ export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleConfirmRemoveAttachment = async () => {
+    if (!attachmentToDelete || !visit?._id) return;
+    setIsRemovingAttachment(true);
+    try {
+      const examIdentifier = attachmentToDelete.exam?._id || attachmentToDelete.examIndex;
+      let updated = null;
+
+      try {
+        const res = await api.visits.removeExamAttachment(visit._id, examIdentifier);
+        if (res?.success && res?.data) {
+          updated = res.data;
+        }
+      } catch (callErr) {
+        console.warn('Rimozione tramite endpoint dedicato fallita, tentativo con fallback:', callErr);
+        // Fallback: update esami array directly via update visit
+        const currentEsami = [...(visit.esami || [])];
+        const idx = attachmentToDelete.examIndex;
+        if (idx >= 0 && idx < currentEsami.length) {
+          currentEsami[idx] = {
+            ...currentEsami[idx],
+            fileAllegato: null,
+            nomeFile: null,
+            tipoFile: null,
+            dimensioneFile: null
+          };
+          const res = await api.visits.update(visit._id, { esami: currentEsami });
+          if (res?.success && res?.data) {
+            updated = res.data;
+          }
+        }
+      }
+
+      if (updated) {
+        setVisit((prev) => ({
+          ...prev,
+          ...updated,
+          esami: updated.esami || prev.esami
+        }));
+        if (onVisitUpdated) {
+          onVisitUpdated(updated);
+        }
+      } else {
+        // Aggiornamento ottimistico locale se necessario
+        setVisit((prev) => {
+          const nextEsami = [...(prev?.esami || [])];
+          if (nextEsami[attachmentToDelete.examIndex]) {
+            nextEsami[attachmentToDelete.examIndex] = {
+              ...nextEsami[attachmentToDelete.examIndex],
+              fileAllegato: null,
+              nomeFile: null,
+              tipoFile: null,
+              dimensioneFile: null
+            };
+          }
+          const nextVisit = { ...prev, esami: nextEsami };
+          if (onVisitUpdated) onVisitUpdated(nextVisit);
+          return nextVisit;
+        });
+      }
+
+      toast.success("Allegato PDF dell'esame rimosso con successo");
+      setAttachmentToDelete(null);
+    } catch (err) {
+      console.error("Errore durante la rimozione dell'allegato:", err);
+      toast.error(err.message || "Impossibile rimuovere l'allegato dall'esame");
+    } finally {
+      setIsRemovingAttachment(false);
+    }
   };
 
   return (
@@ -825,21 +901,41 @@ export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId
                               {esame.stato === 'In lavorazione' ? '⏳ In lavorazione' : '✅ Pronto'}
                             </span>
                             {esame.fileAllegato && (
-                              <button
-                                type="button"
-                                className="no-print btn btn-sm btn-secondary"
-                                onClick={() => downloadAttachment(esame)}
-                                style={{
-                                  fontSize: '7.5pt',
-                                  padding: '2px 6px',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                                title="Scarica il PDF referto del laboratorio"
-                              >
-                                <Download size={12} /> Scarica PDF Esame
-                              </button>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  className="no-print btn btn-sm btn-secondary"
+                                  onClick={() => downloadAttachment(esame)}
+                                  style={{
+                                    fontSize: '7.5pt',
+                                    padding: '2px 7px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  title="Scarica il PDF referto del laboratorio"
+                                >
+                                  <Download size={12} /> Scarica PDF Esame
+                                </button>
+                                <button
+                                  type="button"
+                                  className="no-print btn btn-sm btn-secondary"
+                                  onClick={() => setAttachmentToDelete({ examIndex: idx, exam: esame })}
+                                  style={{
+                                    fontSize: '7.5pt',
+                                    padding: '2px 7px',
+                                    color: '#ef4444',
+                                    borderColor: '#fca5a5',
+                                    background: '#fef2f2',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  title="Rimuovi allegato PDF da questo esame"
+                                >
+                                  <Trash2 size={12} /> Rimuovi Allegato
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -946,6 +1042,20 @@ export const VisitReportModal = ({ isOpen, onClose, visit: initialVisit, visitId
           )}
         </div>
       </div>
+
+      {attachmentToDelete && (
+        <ConfirmModal
+          isOpen={Boolean(attachmentToDelete)}
+          onClose={() => setAttachmentToDelete(null)}
+          onConfirm={handleConfirmRemoveAttachment}
+          title="Rimuovi Allegato Esame"
+          message={`Sei sicuro di voler rimuovere il file PDF allegato all'esame "${attachmentToDelete?.exam?.nome || 'Esame'}"? Il fascicolo PDF verrà aggiornato automaticamente.`}
+          confirmText="Rimuovi Allegato"
+          cancelText="Annulla"
+          type="danger"
+          isLoading={isRemovingAttachment}
+        />
+      )}
     </div>
   );
 };

@@ -100,7 +100,8 @@ export const api = {
     getById: (id) => request(`/visits/${id}`),
     create: (data) => request('/visits', { method: 'POST', body: data }),
     update: (id, data) => request(`/visits/${id}`, { method: 'PUT', body: data }),
-    delete: (id) => request(`/visits/${id}`, { method: 'DELETE' })
+    delete: (id) => request(`/visits/${id}`, { method: 'DELETE' }),
+    removeExamAttachment: (id, examId) => request(`/visits/${id}/esami/${examId}/allegato`, { method: 'DELETE' })
   },
   therapies: {
     getAll: (params = {}) => {

@@ -225,3 +225,58 @@ export const deleteVisit = async (req, res) => {
     });
   }
 };
+
+export const removeExamAttachment = async (req, res) => {
+  try {
+    const { id, examId } = req.params;
+    const existing = await dataStore.getVisitById(id);
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Visita non trovata'
+      });
+    }
+
+    const currentClinicId = existing.ambulatorioId?._id || existing.ambulatorioId;
+    const hasAccess = await dataStore.isUserAuthorizedForClinic(req.user._id, currentClinicId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non sei autorizzato a modificare questa visita'
+      });
+    }
+
+    const rawEsami = existing.esami || [];
+    const esami = rawEsami.map((e) => (typeof e.toObject === 'function' ? e.toObject() : { ...e }));
+
+    const examIndex = esami.findIndex(
+      (e, idx) => (e._id && e._id.toString() === examId) || String(idx) === examId
+    );
+
+    if (examIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Esame non trovato nella visita'
+      });
+    }
+
+    esami[examIndex].fileAllegato = '';
+    esami[examIndex].nomeFile = '';
+    esami[examIndex].tipoFile = '';
+    esami[examIndex].dimensioneFile = 0;
+
+    const updated = await dataStore.updateVisit(id, { esami });
+    res.json({
+      success: true,
+      message: "Allegato PDF rimosso con successo dall'esame",
+      data: updated
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Errore durante la rimozione dell'allegato dall'esame",
+      error: error.message
+    });
+  }
+};
+

@@ -14,7 +14,9 @@ import {
   CheckCircle2,
   AlertCircle,
   FileText,
-  UserCheck
+  UserCheck,
+  Download,
+  Eye
 } from 'lucide-react';
 import { useClinic } from '../../context/ClinicContext';
 import { useAuth } from '../../context/AuthContext';
@@ -724,25 +726,57 @@ export const VisitFormModal = ({
                                 justifyContent: 'space-between',
                                 background: '#f0fdfa',
                                 border: '1px solid #99f6e4',
-                                padding: '0.45rem 0.75rem',
+                                padding: '0.55rem 0.85rem',
                                 borderRadius: '8px',
-                                fontSize: '0.82rem'
+                                fontSize: '0.82rem',
+                                gap: '0.5rem',
+                                flexWrap: 'wrap'
                               }}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0f766e', overflow: 'hidden' }}>
-                                <Paperclip size={14} style={{ flexShrink: 0 }} />
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0f766e', overflow: 'hidden', minWidth: '150px' }}>
+                                <Paperclip size={15} style={{ flexShrink: 0 }} />
                                 <span style={{ fontWeight: 600, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                                   {esame.nomeFile || 'referto.pdf'}
                                 </span>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveExamFile(idx)}
-                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px' }}
-                                title="Rimuovi file allegato"
-                              >
-                                <X size={15} />
-                              </button>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-secondary"
+                                  onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = esame.fileAllegato;
+                                    link.download = esame.nomeFile || 'referto_esame.pdf';
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                  }}
+                                  style={{ padding: '0.25rem 0.55rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  title="Visualizza o scarica il file allegato"
+                                >
+                                  <Download size={13} />
+                                  <span>Visualizza</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-secondary"
+                                  onClick={() => handleRemoveExamFile(idx)}
+                                  style={{
+                                    padding: '0.25rem 0.55rem',
+                                    fontSize: '0.78rem',
+                                    color: '#ef4444',
+                                    borderColor: '#fca5a5',
+                                    backgroundColor: '#ffffff',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  title="Rimuovi il referto PDF allegato a questo esame"
+                                >
+                                  <Trash2 size={13} />
+                                  <span>Rimuovi Allegato</span>
+                                </button>
+                              </div>
                             </div>
                           ) : (
                             <label
