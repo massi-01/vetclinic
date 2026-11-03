@@ -36,7 +36,8 @@ export const PetDetailModal = ({
   onNewVisit,
   onNewTherapy,
   onNewVaccination,
-  onPetDeleted
+  onPetDeleted,
+  refreshTrigger
 }) => {
   const toast = useToast();
   const [pet, setPet] = useState(null);
