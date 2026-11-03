@@ -98,6 +98,23 @@ export const createVisit = async (req, res) => {
       });
     }
 
+    // Verifica integrità paziente e ambulatorio di riferimento
+    const pet = await dataStore.getPetById(animaleId);
+    if (!pet) {
+      return res.status(400).json({
+        success: false,
+        message: 'Paziente selezionato non trovato'
+      });
+    }
+
+    const petClinicId = (pet.ambulatorioId?._id || pet.ambulatorioId)?.toString();
+    if (petClinicId && petClinicId !== ambulatorioId.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Il paziente o il relativo proprietario non risultano registrati presso questo ambulatorio'
+      });
+    }
+
     // Determina il medico esecutore della visita (veterinarioId)
     let assignedVetId = req.user._id;
     if (veterinarioId) {

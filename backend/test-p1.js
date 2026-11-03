@@ -36,6 +36,8 @@ async function runTests() {
   assert(clinics.length >= 2, 'Servono almeno 2 cliniche nel seed');
   const clinic1 = clinics[0];
   const clinic2 = clinics[1];
+  const clinic1Pets = await dataStore.getPets(clinic1._id);
+  const validPetId = clinic1Pets[0]._id;
 
   // Crea un nuovo utente non associato alla clinica 2
   const fakeVet = await dataStore.createUser({
@@ -60,7 +62,7 @@ async function runTests() {
     oraInizio: '14:00',
     oraFine: '14:30',
     motivo: 'Visita 1 - Controllo Generale',
-    animaleId: 'pet-123',
+    animaleId: validPetId,
     proprietarioId: 'owner-123',
     veterinarioId: fakeVet._id,
     ambulatorioId: clinic1._id
@@ -191,6 +193,41 @@ async function runTests() {
   const appsAfterDelete = await dataStore.getAppointments(clinic1._id, { data: visitSyncDate });
   const deletedMatchedApp = appsAfterDelete.find(a => (a.visitaId?._id || a.visitaId)?.toString() === newVisitSync._id.toString());
   assert.strictEqual(deletedMatchedApp, undefined, 'L\'appuntamento deve essere rimosso dal calendario quando la visita viene eliminata');
+
+  // Test 7b: Sincronizzazione automatica Calendario Appuntamenti -> Visite Cliniche
+  console.log('   Verifica sincronizzazione inversa: Appuntamento Agenda -> Visita Clinica...');
+  const newAgendaApp = await dataStore.createAppointment({
+    data: '2026-11-28',
+    oraInizio: '09:30',
+    oraFine: '10:00',
+    tipoPrestazione: 'Visita Specialistica',
+    motivo: 'Controllo ortopedico programmato',
+    animaleId: samplePet._id,
+    proprietarioId: samplePet.proprietarioId?._id || samplePet.proprietarioId,
+    ambulatorioId: clinic1._id,
+    veterinarioId: fakeVet._id
+  });
+
+  assert(newAgendaApp._id, 'Appuntamento da agenda creato');
+  assert(newAgendaApp.visitaId, 'L\'appuntamento deve generare una visita clinica collegata');
+
+  const linkedVisit = await dataStore.getVisitById(newAgendaApp.visitaId);
+  assert(linkedVisit, 'La visita collegata deve essere reperibile tramite getVisitById');
+  assert.strictEqual(linkedVisit.motivo, 'Controllo ortopedico programmato');
+  assert.strictEqual(linkedVisit.stato, 'Prenotata');
+
+  // Aggiornamento stato appuntamento -> Visita aggiornata
+  await dataStore.updateAppointment(newAgendaApp._id, { stato: 'In Visita', motivo: 'Controllo ortopedico in esecuzione' });
+  const updatedLinkedVisit = await dataStore.getVisitById(newAgendaApp.visitaId);
+  assert.strictEqual(updatedLinkedVisit.stato, 'In corso');
+  assert.strictEqual(updatedLinkedVisit.motivo, 'Controllo ortopedico in esecuzione');
+
+  // Cancellazione appuntamento -> Visita eliminata (se Prenotata o Annullata)
+  await dataStore.updateAppointment(newAgendaApp._id, { stato: 'Annullato' });
+  await dataStore.deleteAppointment(newAgendaApp._id);
+  const deletedLinkedVisit = await dataStore.getVisitById(newAgendaApp.visitaId);
+  assert.strictEqual(deletedLinkedVisit, null, 'La visita deve essere eliminata quando l\'appuntamento prenotato viene rimosso');
+  console.log('   ✅ Sincronizzazione bidirezionale Appuntamento Agenda -> Visita verificata con successo.');
   // Test 8: Verifica tracciamento Audit Log Medico-Legale
   console.log('8. Verifica tracciamento Audit Log Medico-Legale...');
   const auditLogs = await dataStore.getAuditLogs({ ambulatorioId: clinic1._id });
@@ -404,6 +441,7 @@ async function runTests() {
   }, mockRes);
   assert.strictEqual(mockStatusCode, 201, 'Proprietario con CF valido deve essere creato');
   assert.strictEqual(mockJsonData.data.codiceFiscale, 'VRDGPP80A01F205X', 'CF deve essere convertito in maiuscolo');
+  const createdOwner = mockJsonData.data;
   console.log('   ✅ Validazione Codice Fiscale (obbligatorio, 16 char, uppercase) verificata con successo.\n');
 
   // Test 12: Verifica Esami/Test Specialistici su Visita (Interno / Esterno / PDF)
@@ -438,7 +476,7 @@ async function runTests() {
       ora: '15:30',
       tipoVisita: 'Visita Specialistica',
       motivo: 'Controllo oncologico e prelievo',
-      animaleId: 'pet-123',
+      animaleId: validPetId,
       ambulatorioId: clinic1._id,
       esami: testExams
     }
@@ -452,6 +490,25 @@ async function runTests() {
   assert.strictEqual(mockJsonData.data.esami[1].stato, 'In lavorazione');
   console.log('   ✅ Salvataggio e persistenza esami interni ed esterni verificati con successo.\n');
 
+  // Verifica blocco inserimento visita se l'animale appartiene ad altro ambulatorio
+  const clinic2Pets = await dataStore.getPets(clinic2._id);
+  mockStatusCode = 0;
+  mockJsonData = null;
+  await createVisit({
+    user: { _id: fakeVet._id },
+    body: {
+      data: '2026-11-25',
+      ora: '16:00',
+      tipoVisita: 'Controllo Generale',
+      motivo: 'Visita non autorizzata per clinica errata',
+      animaleId: clinic2Pets[0]._id,
+      ambulatorioId: clinic1._id
+    }
+  }, mockRes);
+  assert.strictEqual(mockStatusCode, 400, 'Visita per animale di un altro ambulatorio deve restituire 400');
+  assert(mockJsonData.message.includes('non risultano registrati'), 'Messaggio di errore integrità ambulatorio');
+  console.log('   ✅ Validazione integrità paziente/ambulatorio (errore 400 se non registrato) verificata con successo.\n');
+
   // Test 13: Verifica Paziente Deceduto e Data Decesso
   console.log('13. Verifica Paziente Deceduto (dataDecesso) ed eliminazione paziente...');
   const newDeceasedPet = await dataStore.createPet({
@@ -459,7 +516,7 @@ async function runTests() {
     specie: 'Cane',
     razza: 'Pastore Tedesco',
     sesso: 'Maschio',
-    proprietarioId: mockJsonData.data._id,
+    proprietarioId: createdOwner._id,
     ambulatorioId: clinic1._id,
     stato: 'Deceduto',
     dataDecesso: '2026-10-15'
@@ -484,7 +541,7 @@ async function runTests() {
       ora: '11:00',
       tipoVisita: 'Controllo Generale',
       motivo: 'Visita eseguita dal Dottor Esterno',
-      animaleId: 'pet-123',
+      animaleId: validPetId,
       ambulatorioId: clinic1._id,
       veterinarioId: fakeVet._id
     }
@@ -515,7 +572,7 @@ async function runTests() {
     ora: '16:00',
     tipoVisita: 'Controllo Specialistico',
     motivo: 'Verifica rimozione allegato',
-    animaleId: 'pet-123',
+    animaleId: validPetId,
     ambulatorioId: clinic1._id,
     veterinarioId: fakeVet._id,
     esami: [

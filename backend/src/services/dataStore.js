@@ -2011,8 +2011,36 @@ export const dataStore = {
 
   async createAppointment(appData) {
     // Consente visite e appuntamenti paralleli nello stesso slot orario
+    const mapAppStatusToVisitStatus = (status) => {
+      switch (status) {
+        case 'Completato': return 'Completata';
+        case 'In Visita': return 'In corso';
+        case 'Annullato': return 'Annullata';
+        default: return 'Prenotata';
+      }
+    };
+
     if (shouldUseMongo()) {
       const app = new Appointment(appData);
+
+      // Se non è già collegato ad una visita (es. creato da Agenda), genera la visita collegata
+      if (!appData.visitaId) {
+        const visit = new Visit({
+          data: appData.data,
+          ora: appData.oraInizio || '10:00',
+          tipoVisita: appData.tipoPrestazione || 'Controllo Generale',
+          motivo: appData.motivo || 'Appuntamento da Agenda',
+          stato: mapAppStatusToVisitStatus(appData.stato),
+          animaleId: appData.animaleId,
+          ambulatorioId: appData.ambulatorioId,
+          veterinarioId: appData.veterinarioId,
+          note: appData.note || '',
+          appuntamentoId: app._id
+        });
+        const savedVisit = await visit.save();
+        app.visitaId = savedVisit._id;
+      }
+
       const saved = await (await app.save()).populate([
         'animaleId',
         'proprietarioId',
@@ -2039,6 +2067,26 @@ export const dataStore = {
       ...appData,
       createdAt: new Date().toISOString()
     };
+
+    if (!appData.visitaId) {
+      const newVisit = {
+        _id: generateId(),
+        data: appData.data,
+        ora: appData.oraInizio || '10:00',
+        tipoVisita: appData.tipoPrestazione || 'Controllo Generale',
+        motivo: appData.motivo || 'Appuntamento da Agenda',
+        stato: mapAppStatusToVisitStatus(appData.stato),
+        animaleId: appData.animaleId,
+        ambulatorioId: appData.ambulatorioId,
+        veterinarioId: appData.veterinarioId,
+        note: appData.note || '',
+        appuntamentoId: newApp._id,
+        createdAt: new Date().toISOString()
+      };
+      memoryData.visits.push(newVisit);
+      newApp.visitaId = newVisit._id;
+    }
+
     memoryData.appointments.push(newApp);
     const pet = memoryData.pets.find((p) => p._id.toString() === newApp.animaleId?.toString());
     const owner = memoryData.owners.find((o) => o._id.toString() === newApp.proprietarioId?.toString());
@@ -2077,6 +2125,29 @@ export const dataStore = {
           { path: 'veterinarioId', select: 'nome cognome email codiceAlbo ruolo avatarUrl' }
         ]);
 
+      // Sincronizza visita collegata
+      const visitIdToSync = updated.visitaId || existing.visitaId;
+      if (visitIdToSync) {
+        const visitUpdates = {};
+        if (updateData.data) visitUpdates.data = updateData.data;
+        if (updateData.oraInizio) visitUpdates.ora = updateData.oraInizio;
+        if (updateData.motivo) visitUpdates.motivo = updateData.motivo;
+        if (updateData.stato) {
+          const mapAppStatusToVisitStatus = (status) => {
+            switch (status) {
+              case 'Completato': return 'Completata';
+              case 'In Visita': return 'In corso';
+              case 'Annullato': return 'Annullata';
+              default: return 'Prenotata';
+            }
+          };
+          visitUpdates.stato = mapAppStatusToVisitStatus(updateData.stato);
+        }
+        if (Object.keys(visitUpdates).length > 0) {
+          await Visit.findByIdAndUpdate(visitIdToSync, visitUpdates);
+        }
+      }
+
       await this.createAuditLog({
         azione: updateData.stato && updateData.stato !== existing.stato ? 'STATUS_CHANGE' : 'UPDATE',
         entita: 'Appointment',
@@ -2097,6 +2168,27 @@ export const dataStore = {
     const owner = memoryData.owners.find((o) => o._id.toString() === memoryData.appointments[index].proprietarioId?.toString());
     const clinic = memoryData.clinics.find((c) => c._id.toString() === memoryData.appointments[index].ambulatorioId?.toString());
     const vet = memoryData.users.find((u) => u._id.toString() === memoryData.appointments[index].veterinarioId?.toString());
+
+    const memVisitIdToSync = memoryData.appointments[index].visitaId;
+    if (memVisitIdToSync) {
+      const vIdx = memoryData.visits.findIndex((v) => v._id.toString() === memVisitIdToSync.toString());
+      if (vIdx !== -1) {
+        if (updateData.data) memoryData.visits[vIdx].data = updateData.data;
+        if (updateData.oraInizio) memoryData.visits[vIdx].ora = updateData.oraInizio;
+        if (updateData.motivo) memoryData.visits[vIdx].motivo = updateData.motivo;
+        if (updateData.stato) {
+          const mapAppStatusToVisitStatus = (status) => {
+            switch (status) {
+              case 'Completato': return 'Completata';
+              case 'In Visita': return 'In corso';
+              case 'Annullato': return 'Annullata';
+              default: return 'Prenotata';
+            }
+          };
+          memoryData.visits[vIdx].stato = mapAppStatusToVisitStatus(updateData.stato);
+        }
+      }
+    }
 
     await this.createAuditLog({
       azione: updateData.stato && updateData.stato !== existing.stato ? 'STATUS_CHANGE' : 'UPDATE',
@@ -2120,6 +2212,12 @@ export const dataStore = {
   async deleteAppointment(id) {
     const existing = await this.getAppointmentById(id);
     if (shouldUseMongo()) {
+      if (existing?.visitaId) {
+        const linkedVisit = await Visit.findById(existing.visitaId);
+        if (linkedVisit && (linkedVisit.stato === 'Prenotata' || linkedVisit.stato === 'Annullata')) {
+          await Visit.findByIdAndDelete(existing.visitaId);
+        }
+      }
       const deleted = await Appointment.findByIdAndDelete(id);
       if (deleted) {
         await this.createAuditLog({
@@ -2135,6 +2233,12 @@ export const dataStore = {
     const index = memoryData.appointments.findIndex((a) => a._id.toString() === id.toString());
     if (index === -1) return null;
     const removed = memoryData.appointments.splice(index, 1)[0];
+    if (removed?.visitaId) {
+      const vIdx = memoryData.visits.findIndex((v) => v._id.toString() === removed.visitaId.toString());
+      if (vIdx !== -1 && (memoryData.visits[vIdx].stato === 'Prenotata' || memoryData.visits[vIdx].stato === 'Annullata')) {
+        memoryData.visits.splice(vIdx, 1);
+      }
+    }
 
     await this.createAuditLog({
       azione: 'DELETE',

@@ -69,6 +69,9 @@ export const VisitFormModal = ({
   const { user } = useAuth();
   const [pets, setPets] = useState([]);
   const [loadingPets, setLoadingPets] = useState(false);
+  const [owners, setOwners] = useState([]);
+  const [loadingOwners, setLoadingOwners] = useState(false);
+  const [selectedOwnerId, setSelectedOwnerId] = useState('');
   const [includeTherapy, setIncludeTherapy] = useState(false);
   const [showReportPreview, setShowReportPreview] = useState(false);
 
@@ -105,7 +108,7 @@ export const VisitFormModal = ({
 
   useEffect(() => {
     if (isOpen) {
-      loadPets();
+      loadPetsAndOwners();
       if (initialData) {
         setFormData({
           animaleId: initialData.animaleId?._id || initialData.animaleId || '',
@@ -239,24 +242,74 @@ export const VisitFormModal = ({
     });
   };
 
-  const loadPets = async () => {
+  const tipoVisitaOptions = [
+    { value: 'Controllo Generale', label: 'Controllo Generale' },
+    { value: 'Vaccinazione', label: 'Vaccinazione' },
+    { value: 'Pronto Soccorso', label: 'Pronto Soccorso / Urgenza' },
+    { value: 'Chirurgia', label: 'Chirurgia' },
+    { value: 'Visita Specialistica', label: 'Visita Specialistica' },
+    { value: 'Altro', label: 'Altro' }
+  ];
+
+  const statoVisitaOptions = [
+    { value: 'Completata', label: 'Completata' },
+    { value: 'In corso', label: 'In corso' },
+    { value: 'Prenotata', label: 'Prenotata' },
+    { value: 'Annullata', label: 'Annullata' }
+  ];
+
+  const tipoEsameOptions = [
+    { value: 'Interno', label: 'Interno (Ambulatorio)' },
+    { value: 'Esterno', label: 'Esterno (Laboratorio)' }
+  ];
+
+  const statoEsameOptions = [
+    { value: 'In lavorazione', label: 'In lavorazione (Inviato)' },
+    { value: 'Pronto', label: 'Pronto / Refertato' }
+  ];
+
+  const loadPetsAndOwners = async () => {
     try {
       setLoadingPets(true);
-      const res = await api.pets.getAll();
-      if (res.success) {
-        setPets(res.data);
-        if (!formData.animaleId && !defaultPet && res.data.length > 0) {
-          setFormData((prev) => ({
-            ...prev,
-            animaleId: res.data[0]._id,
-            ambulatorioId: res.data[0].ambulatorioId?._id || res.data[0].ambulatorioId || prev.ambulatorioId
-          }));
-        }
+      setLoadingOwners(true);
+      const params = activeClinic?._id ? { clinicId: activeClinic._id } : {};
+      const [petsRes, ownersRes] = await Promise.all([
+        api.pets.getAll(params),
+        api.owners.getAll(params)
+      ]);
+
+      const loadedPets = petsRes.success ? petsRes.data : [];
+      const loadedOwners = ownersRes.success ? ownersRes.data : [];
+
+      setPets(loadedPets);
+      setOwners(loadedOwners);
+
+      // Risolvi il proprietario e il paziente corretti
+      if (initialData) {
+        const petId = initialData.animaleId?._id || initialData.animaleId;
+        const matchingPet = loadedPets.find((p) => p._id === petId);
+        const ownerId = matchingPet?.proprietarioId?._id || matchingPet?.proprietarioId || initialData.animaleId?.proprietarioId?._id || initialData.animaleId?.proprietarioId;
+        if (ownerId) setSelectedOwnerId(ownerId);
+      } else if (defaultPet) {
+        const ownerId = defaultPet.proprietarioId?._id || defaultPet.proprietarioId;
+        if (ownerId) setSelectedOwnerId(ownerId);
+      } else if (loadedOwners.length > 0) {
+        // Seleziona il primo proprietario se nessuno è ancora selezionato
+        setSelectedOwnerId((prev) => {
+          if (prev && loadedOwners.some((o) => o._id === prev)) return prev;
+          const firstOwnerId = loadedOwners[0]._id;
+          const firstOwnerPets = loadedPets.filter((p) => (p.proprietarioId?._id || p.proprietarioId)?.toString() === firstOwnerId.toString());
+          if (firstOwnerPets.length > 0) {
+            setFormData((f) => ({ ...f, animaleId: firstOwnerPets[0]._id }));
+          }
+          return firstOwnerId;
+        });
       }
     } catch (err) {
-      console.error('Errore caricamento animali:', err.message);
+      console.error('Errore caricamento pazienti e proprietari:', err.message);
     } finally {
       setLoadingPets(false);
+      setLoadingOwners(false);
     }
   };
 
@@ -329,10 +382,20 @@ export const VisitFormModal = ({
     }
   };
 
-  const petOptions = pets.map((p) => ({
+  const availablePets = selectedOwnerId
+    ? pets.filter((p) => (p.proprietarioId?._id || p.proprietarioId)?.toString() === selectedOwnerId.toString())
+    : pets;
+
+  const ownerOptions = owners.map((o) => ({
+    value: o._id,
+    label: `${o.cognome} ${o.nome}`,
+    sublabel: o.codiceFiscale ? `CF: ${o.codiceFiscale}` : (o.telefono || '')
+  }));
+
+  const petOptions = availablePets.map((p) => ({
     value: p._id,
     label: p.nome,
-    sublabel: `${p.specie} • ${p.razza || 'Meticcio'} (Prop: ${p.proprietarioId?.cognome || 'N/D'})`
+    sublabel: `${p.specie} - ${p.razza || 'Meticcio'}${p.stato === 'Deceduto' ? ' [Deceduto]' : ''}`
   }));
 
   const clinicOptions = clinics.map((c) => ({
@@ -354,7 +417,7 @@ export const VisitFormModal = ({
   }));
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1250 }}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px' }}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -376,70 +439,87 @@ export const VisitFormModal = ({
               </div>
             )}
 
-            {/* Paziente e Medico Esecutore */}
+            {/* Selezione Proprietario e Paziente Filtrato */}
             <div className="form-row form-row-2">
+              <div className="form-group">
+                <label className="form-label">Proprietario (Cliente) *</label>
+                <CustomSelect
+                  id="visit-select-owner"
+                  value={selectedOwnerId}
+                  onChange={(val) => {
+                    setSelectedOwnerId(val);
+                    const ownerPets = pets.filter((p) => (p.proprietarioId?._id || p.proprietarioId)?.toString() === val?.toString());
+                    const firstPet = ownerPets[0];
+                    setFormData((prev) => ({
+                      ...prev,
+                      animaleId: firstPet ? firstPet._id : '',
+                      pesoRilevato: firstPet?.pesoAttuale || prev.pesoRilevato
+                    }));
+                  }}
+                  options={ownerOptions}
+                  placeholder="Seleziona prima il proprietario..."
+                />
+              </div>
+
               <div className="form-group">
                 <label className="form-label">Paziente (Animale) *</label>
                 <CustomSelect
                   id="visit-select-pet"
                   name="animaleId"
                   value={formData.animaleId}
-                  onChange={(e) => {
-                    const sel = pets.find((p) => p._id === e.target.value);
-                    setFormData({
-                      ...formData,
-                      animaleId: e.target.value,
-                      pesoRilevato: sel?.pesoAttuale || formData.pesoRilevato
-                    });
+                  onChange={(val) => {
+                    const sel = pets.find((p) => p._id === val);
+                    setFormData((prev) => ({
+                      ...prev,
+                      animaleId: val,
+                      pesoRilevato: sel?.pesoAttuale || prev.pesoRilevato
+                    }));
                   }}
                   options={petOptions}
-                  placeholder="Seleziona paziente..."
+                  placeholder={availablePets.length > 0 ? "Seleziona paziente..." : (selectedOwnerId ? "Nessun animale registrato per questo cliente" : "Seleziona prima il proprietario...")}
+                  disabled={!selectedOwnerId}
                 />
               </div>
+            </div>
 
+            {/* Medico Veterinario e Tipo Visita */}
+            <div className="form-row form-row-2">
               <div className="form-group">
                 <label className="form-label">Medico Veterinario Esecutore *</label>
                 <CustomSelect
                   id="visit-select-veterinario"
                   name="veterinarioId"
                   value={formData.veterinarioId}
-                  onChange={(e) => setFormData({ ...formData, veterinarioId: e.target.value })}
+                  onChange={(val) => setFormData((prev) => ({ ...prev, veterinarioId: val }))}
                   options={vetOptions}
                   placeholder="Seleziona medico veterinario..."
-                />
-              </div>
-            </div>
-
-            {/* Ambulatorio e Tipo Visita */}
-            <div className="form-row form-row-2">
-              <div className="form-group">
-                <label className="form-label">Ambulatorio di Riferimento *</label>
-                <CustomSelect
-                  id="visit-select-ambulatorio"
-                  name="ambulatorioId"
-                  value={formData.ambulatorioId}
-                  onChange={(e) => setFormData({ ...formData, ambulatorioId: e.target.value })}
-                  options={clinicOptions}
-                  placeholder="Seleziona ambulatorio..."
                 />
               </div>
 
               <div className="form-group">
                 <label className="form-label">Tipo Visita *</label>
-                <select
+                <CustomSelect
                   id="visit-select-tipo"
-                  className="form-select"
+                  name="tipoVisita"
                   value={formData.tipoVisita}
-                  onChange={(e) => setFormData({ ...formData, tipoVisita: e.target.value })}
-                >
-                  <option value="Controllo Generale">Controllo Generale</option>
-                  <option value="Vaccinazione">Vaccinazione</option>
-                  <option value="Pronto Soccorso">Pronto Soccorso / Urgenza</option>
-                  <option value="Chirurgia">Chirurgia</option>
-                  <option value="Visita Specialistica">Visita Specialistica</option>
-                  <option value="Altro">Altro</option>
-                </select>
+                  onChange={(val) => setFormData((prev) => ({ ...prev, tipoVisita: val }))}
+                  options={tipoVisitaOptions}
+                  placeholder="Seleziona tipo visita..."
+                />
               </div>
+            </div>
+
+            {/* Ambulatorio di Riferimento */}
+            <div className="form-group" style={{ marginBottom: '1rem' }}>
+              <label className="form-label">Ambulatorio di Riferimento *</label>
+              <CustomSelect
+                id="visit-select-ambulatorio"
+                name="ambulatorioId"
+                value={formData.ambulatorioId}
+                onChange={(val) => setFormData((prev) => ({ ...prev, ambulatorioId: val }))}
+                options={clinicOptions}
+                placeholder="Seleziona ambulatorio..."
+              />
             </div>
 
             {/* Data e Ora */}
@@ -471,16 +551,13 @@ export const VisitFormModal = ({
 
               <div className="form-group">
                 <label className="form-label">Stato Visita</label>
-                <select
+                <CustomSelect
                   id="visit-select-stato"
-                  className="form-select"
                   value={formData.stato}
-                  onChange={(e) => setFormData({ ...formData, stato: e.target.value })}
-                >
-                  <option value="Completata">Completata</option>
-                  <option value="In corso">In corso</option>
-                  <option value="Prenotata">Prenotata</option>
-                </select>
+                  onChange={(val) => setFormData((prev) => ({ ...prev, stato: val }))}
+                  options={statoVisitaOptions}
+                  placeholder="Seleziona stato..."
+                />
               </div>
             </div>
 
@@ -660,14 +737,11 @@ export const VisitFormModal = ({
 
                         <div className="form-group">
                           <label className="form-label">Tipologia Esame *</label>
-                          <select
-                            className="form-select"
-                            value={esame.tipologia}
-                            onChange={(e) => handleUpdateExam(idx, 'tipologia', e.target.value)}
-                          >
-                            <option value="Interno">Interno (Ambulatorio)</option>
-                            <option value="Esterno">Esterno (Laboratorio)</option>
-                          </select>
+                          <CustomSelect
+                            value={esame.tipologia || 'Interno'}
+                            options={tipoEsameOptions}
+                            onChange={(val) => handleUpdateExam(idx, 'tipologia', val)}
+                          />
                         </div>
                       </div>
 
@@ -691,14 +765,11 @@ export const VisitFormModal = ({
                             <label className="form-label" style={{ color: 'var(--primary)' }}>
                               Stato Lavorazione *
                             </label>
-                            <select
-                              className="form-select"
+                            <CustomSelect
                               value={esame.stato || 'In lavorazione'}
-                              onChange={(e) => handleUpdateExam(idx, 'stato', e.target.value)}
-                            >
-                              <option value="In lavorazione">⏳ In lavorazione (Inviato)</option>
-                              <option value="Pronto">✅ Pronto / Refertato</option>
-                            </select>
+                              options={statoEsameOptions}
+                              onChange={(val) => handleUpdateExam(idx, 'stato', val)}
+                            />
                           </div>
                         </div>
                       )}

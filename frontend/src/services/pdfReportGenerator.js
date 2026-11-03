@@ -1,6 +1,38 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 /**
+ * Pulisce qualsiasi stringa da emoji o caratteri fuori dalla codifica WinAnsi/Latin1
+ * supportata dai font standard di pdf-lib (Helvetica, HelveticaBold, HelveticaOblique).
+ */
+export function sanitizeWinAnsi(text) {
+  if (text === null || text === undefined) return '';
+  return String(text)
+    // Sostituisci emoji comuni con descrizioni o simboli ASCII
+    .replace(/[\u{1F4CE}\u{1F4C4}\u{1F4CB}]/gu, '')
+    .replace(/[\u{1F436}\u{1F415}]/gu, '')
+    .replace(/[\u{1F431}\u{1F408}]/gu, '')
+    .replace(/[\u{1F430}]/gu, '')
+    .replace(/[\u{1F54A}\u{1F426}]/gu, '')
+    .replace(/[\u{23F3}\u{231B}]/gu, '')
+    .replace(/[\u{2705}\u{2714}\u{2713}]/gu, '')
+    .replace(/[\u{26A0}\u{2757}]/gu, '!')
+    .replace(/[\u{1F3E5}\u{1F3E0}]/gu, '')
+    .replace(/[\u{1FA7A}]/gu, '')
+    .replace(/[\u{1F52C}]/gu, '')
+    .replace(/[\u{1F48A}]/gu, '')
+    .replace(/[\u{1F494}]/gu, '')
+    .replace(/•/g, '-')
+    // Rimuovi qualsiasi emoji surrogata o code point > 255 non supportato da WinAnsi
+    .replace(/[\u{10000}-\u{10FFFF}]/gu, '')
+    .replace(/[\u{2000}-\u{32FF}]/gu, ' ')
+    .replace(/[\u{E000}-\u{F8FF}]/gu, '')
+    .replace(/[\u{FE00}-\u{FE0F}]/gu, '')
+    .replace(/[^\x00-\xFF]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Converte una stringa base64 o dataURL in Uint8Array
  */
 function base64ToUint8Array(base64Str) {
@@ -23,7 +55,8 @@ function base64ToUint8Array(base64Str) {
  */
 function wrapText(text, maxWidth, font, fontSize) {
   if (!text) return [];
-  const words = String(text).split(' ');
+  const clean = sanitizeWinAnsi(text);
+  const words = clean.split(' ');
   const lines = [];
   let currentLine = '';
 
@@ -69,10 +102,16 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
   let currentPage = mergedPdf.addPage([pageWidth, pageHeight]);
   let y = pageHeight - margin;
 
+  const safeDraw = (text, options, font = fontRegular) => {
+    const clean = sanitizeWinAnsi(text);
+    if (!clean) return;
+    currentPage.drawText(clean, { font, ...options });
+  };
+
   const checkPageBreak = (neededHeight) => {
     if (y - neededHeight < margin + 30) {
       // Aggiungi footer pagina corrente
-      currentPage.drawText(`Pagina ${mergedPdf.getPageCount()} • VetClinic Gestionale Veterinario`, {
+      safeDraw(`Pagina ${mergedPdf.getPageCount()} - VetClinic Gestionale Veterinario`, {
         x: margin,
         y: margin - 15,
         size: 8,
@@ -94,7 +133,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
   const clinicEmail = clinic?.email ? `Email: ${clinic.email}` : '';
   const clinicPiva = clinic?.partitaIva ? `P.IVA: ${clinic.partitaIva}` : '';
 
-  currentPage.drawText(clinicNome.toUpperCase(), {
+  safeDraw(clinicNome.toUpperCase(), {
     x: margin,
     y: y - 14,
     size: 14,
@@ -102,14 +141,14 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
     color: primaryColor
   });
 
-  const clinicSubText = [clinicIndirizzo, [clinicTel, clinicEmail, clinicPiva].filter(Boolean).join(' • ')]
+  const clinicSubText = [clinicIndirizzo, [clinicTel, clinicEmail, clinicPiva].filter(Boolean).join(' - ')]
     .filter(Boolean)
     .join('\n');
 
   let subY = y - 28;
   const clinicLines = clinicSubText.split('\n');
   for (const line of clinicLines) {
-    currentPage.drawText(line, {
+    safeDraw(line, {
       x: margin,
       y: subY,
       size: 8.5,
@@ -144,7 +183,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
     borderRadius: 4
   });
 
-  currentPage.drawText('REFERTO CLINICO VETERINARIO UFFICIALE', {
+  safeDraw('REFERTO CLINICO VETERINARIO UFFICIALE', {
     x: margin + 10,
     y: y - 15,
     size: 9.5,
@@ -152,7 +191,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
     color: rgb(1, 1, 1)
   });
 
-  currentPage.drawText(`N. ${protocolNumber} • ${new Date(visit.data || Date.now()).toLocaleDateString('it-IT')}`, {
+  safeDraw(`N. ${protocolNumber} - ${new Date(visit.data || Date.now()).toLocaleDateString('it-IT')}`, {
     x: pageWidth - margin - 220,
     y: y - 15,
     size: 9,
@@ -177,7 +216,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
     borderWidth: 1
   });
 
-  currentPage.drawText('PAZIENTE', {
+  safeDraw('PAZIENTE', {
     x: margin + 8,
     y: y - 14,
     size: 8,
@@ -186,12 +225,12 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
   });
 
   const petNome = pet?.nome || 'N/D';
-  const petSpecie = `${pet?.specie || ''} ${pet?.razza ? `• ${pet.razza}` : ''}`.trim();
+  const petSpecie = `${pet?.specie || ''} ${pet?.razza ? `- ${pet.razza}` : ''}`.trim();
   const petSesso = pet?.sesso || 'N/D';
   const petChip = pet?.microchip ? `Microchip: ${pet.microchip}` : 'Microchip: Non registrato';
   const isDeceduto = pet?.stato === 'Deceduto';
 
-  currentPage.drawText(petNome, {
+  safeDraw(petNome, {
     x: margin + 8,
     y: y - 28,
     size: 11,
@@ -200,8 +239,8 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
   });
 
   if (isDeceduto) {
-    currentPage.drawText('[DECEDUTO]', {
-      x: margin + 8 + fontBold.widthOfTextAtSize(petNome, 11) + 6,
+    safeDraw('[DECEDUTO]', {
+      x: margin + 8 + fontBold.widthOfTextAtSize(sanitizeWinAnsi(petNome), 11) + 6,
       y: y - 28,
       size: 8,
       font: fontBold,
@@ -209,7 +248,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
     });
   }
 
-  currentPage.drawText(`${petSpecie} (${petSesso})`, {
+  safeDraw(`${petSpecie} (${petSesso})`, {
     x: margin + 8,
     y: y - 41,
     size: 8,
@@ -217,7 +256,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
     color: darkSlate
   });
 
-  currentPage.drawText(petChip, {
+  safeDraw(petChip, {
     x: margin + 8,
     y: y - 54,
     size: 7.8,
@@ -237,7 +276,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
     borderWidth: 1
   });
 
-  currentPage.drawText('PROPRIETARIO REFERENTE', {
+  safeDraw('PROPRIETARIO REFERENTE', {
     x: box2X + 8,
     y: y - 14,
     size: 8,
@@ -249,7 +288,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
   const ownerCf = owner?.codiceFiscale ? `C.F.: ${owner.codiceFiscale}` : 'C.F.: N/D';
   const ownerTel = owner?.telefono ? `Tel: ${owner.telefono}` : '';
 
-  currentPage.drawText(ownerNome, {
+  safeDraw(ownerNome, {
     x: box2X + 8,
     y: y - 28,
     size: 10,
@@ -257,7 +296,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
     color: darkSlate
   });
 
-  currentPage.drawText(ownerCf, {
+  safeDraw(ownerCf, {
     x: box2X + 8,
     y: y - 41,
     size: 8,
@@ -265,7 +304,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
     color: darkSlate
   });
 
-  currentPage.drawText(ownerTel, {
+  safeDraw(ownerTel, {
     x: box2X + 8,
     y: y - 54,
     size: 8,
@@ -280,7 +319,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
   const vitalsBoxWidth = (contentWidth - 18) / 4;
   const vitals = [
     { label: 'PESO', val: visit.parametriVitali?.pesoRilevato ? `${visit.parametriVitali.pesoRilevato} kg` : (pet?.pesoAttuale ? `${pet.pesoAttuale} kg` : 'N/D') },
-    { label: 'TEMPERATURA', val: visit.parametriVitali?.temperatura ? `${visit.parametriVitali.temperatura} °C` : 'N/D' },
+    { label: 'TEMPERATURA', val: visit.parametriVitali?.temperatura ? `${visit.parametriVitali.temperatura} C` : 'N/D' },
     { label: 'FREQ. CARDIACA', val: visit.parametriVitali?.frequenzaCardiaca ? `${visit.parametriVitali.frequenzaCardiaca} bpm` : 'N/D' },
     { label: 'FREQ. RESP.', val: visit.parametriVitali?.frequenzaRespiratoria ? `${visit.parametriVitali.frequenzaRespiratoria} atti/m` : 'N/D' }
   ];
@@ -297,7 +336,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
       borderWidth: 1
     });
 
-    currentPage.drawText(vt.label, {
+    safeDraw(vt.label, {
       x: vx + 6,
       y: y - 11,
       size: 6.8,
@@ -305,7 +344,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
       color: mutedText
     });
 
-    currentPage.drawText(vt.val, {
+    safeDraw(vt.val, {
       x: vx + 6,
       y: y - 24,
       size: 9.5,
@@ -323,7 +362,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
     const secHeight = 18 + lines.length * 12 + 6;
     checkPageBreak(secHeight);
 
-    currentPage.drawText(title.toUpperCase(), {
+    safeDraw(title.toUpperCase(), {
       x: margin,
       y: y - 10,
       size: 8,
@@ -343,7 +382,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
 
     let lineY = y - 24;
     for (const line of lines) {
-      currentPage.drawText(line, {
+      safeDraw(line, {
         x: margin + 8,
         y: lineY,
         size: 8.5,
@@ -365,7 +404,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
   if (esami.length > 0) {
     checkPageBreak(40 + esami.length * 28);
 
-    currentPage.drawText('ESAMI, TEST E PRESTAZIONI SPECIALISTICHE', {
+    safeDraw('ESAMI, TEST E PRESTAZIONI SPECIALISTICHE', {
       x: margin,
       y: y - 10,
       size: 8.5,
@@ -377,7 +416,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
 
     for (const esame of esami) {
       const isEsterno = esame.tipologia === 'Esterno';
-      const esameTitle = `${esame.nome || 'Esame specialistico'} [${esame.tipologia || 'Interno'}${isEsterno && esame.laboratorio ? ` • Lab: ${esame.laboratorio}` : ''}]`;
+      const esameTitle = `${esame.nome || 'Esame specialistico'} [${esame.tipologia || 'Interno'}${isEsterno && esame.laboratorio ? ` - Lab: ${esame.laboratorio}` : ''}]`;
       const statoText = `Stato: ${esame.stato || 'Pronto'}${esame.dataReferto ? ` (${new Date(esame.dataReferto).toLocaleDateString('it-IT')})` : ''}`;
 
       const cardH = 34 + (esame.esito ? 14 : 0) + (esame.fileAllegato ? 12 : 0);
@@ -393,7 +432,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
         borderWidth: 1
       });
 
-      currentPage.drawText(esameTitle, {
+      safeDraw(esameTitle, {
         x: margin + 8,
         y: y - 14,
         size: 9,
@@ -401,7 +440,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
         color: darkSlate
       });
 
-      currentPage.drawText(statoText, {
+      safeDraw(statoText, {
         x: pageWidth - margin - 150,
         y: y - 14,
         size: 8,
@@ -411,7 +450,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
 
       let currentEy = y - 26;
       if (esame.esito) {
-        currentPage.drawText(`Esito: ${esame.esito}`, {
+        safeDraw(`Esito: ${esame.esito}`, {
           x: margin + 8,
           y: currentEy,
           size: 8,
@@ -422,7 +461,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
       }
 
       if (esame.fileAllegato) {
-        currentPage.drawText(`📎 Documento PDF allegato al fascicolo: ${esame.nomeFile || 'referto_laboratorio.pdf'}`, {
+        safeDraw(`Documento PDF allegato al fascicolo: ${esame.nomeFile || 'referto_laboratorio.pdf'}`, {
           x: margin + 8,
           y: currentEy,
           size: 7.8,
@@ -441,7 +480,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
   if (terapie.length > 0) {
     checkPageBreak(40 + terapie.length * 24);
 
-    currentPage.drawText('PRESCRIZIONI FARMACOLOGICHE & TERAPIE', {
+    safeDraw('PRESCRIZIONI FARMACOLOGICHE & TERAPIE', {
       x: margin,
       y: y - 10,
       size: 8.5,
@@ -465,7 +504,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
         borderWidth: 1
       });
 
-      currentPage.drawText(`• ${t.nomeFarmaco || 'Farmaco'}${t.dosaggio ? ` (${t.dosaggio})` : ''}`, {
+      safeDraw(`- ${t.nomeFarmaco || 'Farmaco'}${t.dosaggio ? ` (${t.dosaggio})` : ''}`, {
         x: margin + 8,
         y: y - 15,
         size: 8.5,
@@ -473,8 +512,8 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
         color: darkSlate
       });
 
-      const posology = `${t.posologia || ''} • Via: ${t.viaSomministrazione || 'Orale'}${t.durataGiorni ? ` (${t.durataGiorni} gg)` : ''}`;
-      currentPage.drawText(posology, {
+      const posology = `${t.posologia || ''} - Via: ${t.viaSomministrazione || 'Orale'}${t.durataGiorni ? ` (${t.durataGiorni} gg)` : ''}`;
+      safeDraw(posology, {
         x: margin + 200,
         y: y - 15,
         size: 8,
@@ -503,7 +542,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
   const vetNome = vet ? `Dr. ${vet.nome || ''} ${vet.cognome || ''}`.trim() : 'Medico Veterinario Curante';
   const vetAlbo = vet?.codiceAlbo ? `Iscritto all'Ordine dei Medici Veterinari: ${vet.codiceAlbo}` : '';
 
-  currentPage.drawText(`Data refertazione: ${new Date(visit.data || Date.now()).toLocaleDateString('it-IT')}`, {
+  safeDraw(`Data refertazione: ${new Date(visit.data || Date.now()).toLocaleDateString('it-IT')}`, {
     x: margin,
     y: y - 5,
     size: 8.5,
@@ -511,7 +550,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
     color: mutedText
   });
 
-  currentPage.drawText('Timbro e Firma del Medico Veterinario', {
+  safeDraw('Timbro e Firma del Medico Veterinario', {
     x: pageWidth - margin - 200,
     y: y - 5,
     size: 8.5,
@@ -519,7 +558,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
     color: darkSlate
   });
 
-  currentPage.drawText(vetNome, {
+  safeDraw(vetNome, {
     x: pageWidth - margin - 200,
     y: y - 18,
     size: 8.5,
@@ -528,7 +567,7 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
   });
 
   if (vetAlbo) {
-    currentPage.drawText(vetAlbo, {
+    safeDraw(vetAlbo, {
       x: pageWidth - margin - 200,
       y: y - 29,
       size: 7.5,
@@ -541,7 +580,8 @@ export async function generateMergedVisitPdf({ visit, clinic, pet, owner, vet })
   const totalReportPages = mergedPdf.getPageCount();
   for (let i = 0; i < totalReportPages; i++) {
     const p = mergedPdf.getPage(i);
-    p.drawText(`Fascicolo Visita Clinica • Protocollo ${protocolNumber} • Pagina ${i + 1} di ${totalReportPages}`, {
+    const cleanFoot = sanitizeWinAnsi(`Fascicolo Visita Clinica - Protocollo ${protocolNumber} - Pagina ${i + 1} di ${totalReportPages}`);
+    p.drawText(cleanFoot, {
       x: margin,
       y: margin - 15,
       size: 7.5,

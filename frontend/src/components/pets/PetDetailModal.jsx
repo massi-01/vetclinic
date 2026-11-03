@@ -48,6 +48,8 @@ export const PetDetailModal = ({
   const [error, setError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingPet, setIsDeletingPet] = useState(false);
+  const [vaccineToDelete, setVaccineToDelete] = useState(null);
+  const [isDeletingVac, setIsDeletingVac] = useState(false);
 
   const loadPetDetails = async () => {
     if (!petId) return;
@@ -74,16 +76,20 @@ export const PetDetailModal = ({
     }
   };
 
-  const handleDeleteVaccination = async (id) => {
-    if (!window.confirm('Vuoi rimuovere questo vaccino dal registro?')) return;
+  const handleDeleteVaccination = async () => {
+    if (!vaccineToDelete) return;
     try {
-      const res = await api.vaccinations.delete(id);
+      setIsDeletingVac(true);
+      const res = await api.vaccinations.delete(vaccineToDelete._id || vaccineToDelete);
       if (res.success) {
-        setVaccinations((prev) => prev.filter((v) => v._id !== id));
+        setVaccinations((prev) => prev.filter((v) => v._id !== (vaccineToDelete._id || vaccineToDelete)));
         toast.success('Vaccino rimosso dal registro sanitario');
+        setVaccineToDelete(null);
       }
     } catch (err) {
       toast.error(err.message || 'Errore durante la rimozione del vaccino');
+    } finally {
+      setIsDeletingVac(false);
     }
   };
 
@@ -110,9 +116,14 @@ export const PetDetailModal = ({
   useEffect(() => {
     if (isOpen && petId) {
       loadPetDetails();
+    }
+  }, [isOpen, petId, refreshTrigger]);
+
+  useEffect(() => {
+    if (isOpen) {
       setActiveTab('anagrafica');
     }
-  }, [isOpen, petId]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -668,7 +679,7 @@ export const PetDetailModal = ({
                               <button
                                 className="btn btn-icon btn-secondary"
                                 style={{ width: '28px', height: '28px', padding: 0, color: 'var(--rose-500)' }}
-                                onClick={() => handleDeleteVaccination(vac._id)}
+                                onClick={() => setVaccineToDelete(vac)}
                                 title="Elimina registrazione vaccino"
                               >
                                 <Trash2 size={13} />
@@ -826,6 +837,23 @@ export const PetDetailModal = ({
           onClose={() => setSelectedVisitForReport(null)}
           visit={selectedVisitForReport}
           pet={pet}
+        />
+
+        {/* Modale di Conferma Eliminazione Vaccino */}
+        <ConfirmModal
+          isOpen={Boolean(vaccineToDelete)}
+          onClose={() => setVaccineToDelete(null)}
+          onConfirm={handleDeleteVaccination}
+          title="Rimuovi Vaccino"
+          message={
+            <span>
+              Sei sicuro di voler rimuovere la registrazione del vaccino <strong>{vaccineToDelete?.nomeVaccino}</strong>?
+            </span>
+          }
+          confirmText="Rimuovi Vaccino"
+          cancelText="Annulla"
+          type="danger"
+          isLoading={isDeletingVac}
         />
 
         {/* Modale di Conferma Eliminazione Cartella Paziente */}

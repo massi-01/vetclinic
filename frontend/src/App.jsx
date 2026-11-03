@@ -433,6 +433,7 @@ const MainLayout = () => {
         onNewVisit={handleOpenNewVisit}
         onNewTherapy={handleOpenNewTherapy}
         onNewVaccination={handleOpenNewVaccination}
+        refreshTrigger={dataRefreshTrigger}
         onPetDeleted={() => {
           setIsPetDetailOpen(false);
           triggerDataRefresh();

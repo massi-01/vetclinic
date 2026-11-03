@@ -77,7 +77,8 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
   const loadOwners = async () => {
     try {
       setLoadingOwners(true);
-      const res = await api.owners.getAll();
+      const params = activeClinic?._id ? { clinicId: activeClinic._id } : {};
+      const res = await api.owners.getAll(params);
       if (res.success) {
         setOwners(res.data);
         if (!formData.proprietarioId && res.data.length > 0 && !defaultOwnerId) {
@@ -143,6 +144,22 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
     }
   };
 
+  const specieOptions = [
+    { value: 'Cane', label: 'Cane 🐶' },
+    { value: 'Gatto', label: 'Gatto 🐱' },
+    { value: 'Coniglio', label: 'Coniglio 🐰' },
+    { value: 'Volatile', label: 'Volatile 🦜' },
+    { value: 'Rettile', label: 'Rettile 🦎' },
+    { value: 'Altro', label: 'Altro 🐾' }
+  ];
+
+  const sessoOptions = [
+    { value: 'Maschio', label: 'Maschio' },
+    { value: 'Femmina', label: 'Femmina' },
+    { value: 'Maschio Castrato', label: 'Maschio Castrato' },
+    { value: 'Femmina Sterilizzata', label: 'Femmina Sterilizzata' }
+  ];
+
   const ownerOptions = owners.map((o) => ({
     value: o._id,
     label: `${o.cognome} ${o.nome}`,
@@ -164,7 +181,7 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
   ];
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1250 }}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px' }}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -224,19 +241,12 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
 
               <div className="form-group">
                 <label className="form-label">Specie *</label>
-                <select
-                  id="pet-select-specie"
-                  className="form-select"
+                <CustomSelect
                   value={formData.specie}
-                  onChange={(e) => setFormData({ ...formData, specie: e.target.value })}
-                >
-                  <option value="Cane">Cane 🐶</option>
-                  <option value="Gatto">Gatto 🐱</option>
-                  <option value="Coniglio">Coniglio 🐰</option>
-                  <option value="Volatile">Volatile 🦜</option>
-                  <option value="Rettile">Rettile 🦎</option>
-                  <option value="Altro">Altro 🐾</option>
-                </select>
+                  options={specieOptions}
+                  onChange={(val) => setFormData({ ...formData, specie: val })}
+                  placeholder="Seleziona Specie..."
+                />
               </div>
             </div>
 
@@ -255,17 +265,12 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
 
               <div className="form-group">
                 <label className="form-label">Sesso</label>
-                <select
-                  id="pet-select-sesso"
-                  className="form-select"
+                <CustomSelect
                   value={formData.sesso}
-                  onChange={(e) => setFormData({ ...formData, sesso: e.target.value })}
-                >
-                  <option value="Maschio">Maschio</option>
-                  <option value="Femmina">Femmina</option>
-                  <option value="Maschio Castrato">Maschio Castrato</option>
-                  <option value="Femmina Sterilizzata">Femmina Sterilizzata</option>
-                </select>
+                  options={sessoOptions}
+                  onChange={(val) => setFormData({ ...formData, sesso: val })}
+                  placeholder="Seleziona Sesso..."
+                />
               </div>
             </div>
 
