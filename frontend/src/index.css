@@ -701,16 +701,24 @@ a {
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
+}
+
+.form-row > * {
+  min-width: 0;
+}
+
+.form-group {
+  min-width: 0;
 }
 
 @media (min-width: 640px) {
   .form-row-2 {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .form-row-3 {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -772,6 +780,7 @@ a {
 .modal-body {
   padding: 1.5rem;
   overflow-y: auto;
+  overflow-x: hidden;
   flex: 1;
 }
 

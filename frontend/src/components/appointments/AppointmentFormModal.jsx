@@ -5,6 +5,15 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { CustomSelect } from '../common/CustomSelect';
 
+const unwrapVal = (e) => {
+  if (e === null || e === undefined) return '';
+  if (typeof e === 'object') {
+    if ('value' in e && typeof e.value !== 'object') return e.value;
+    if (e.target && 'value' in e.target) return e.target.value;
+  }
+  return e;
+};
+
 export const AppointmentFormModal = ({
   isOpen,
   onClose,
@@ -99,12 +108,11 @@ export const AppointmentFormModal = ({
           note: initialData.note || ''
         });
       } else {
-        setFormData((prev) => ({
-          ...prev,
+        setFormData({
           animaleId: defaultPet?._id || '',
           proprietarioId: defaultPet?.proprietarioId?._id || defaultPet?.proprietarioId || '',
           ambulatorioId: activeClinic?._id || '',
-          veterinarioId: user?._id || prev.veterinarioId || '',
+          veterinarioId: user?._id || '',
           data: defaultDate || todayStr,
           oraInizio: defaultTime || '09:00',
           durataMinuti: 30,
@@ -112,11 +120,11 @@ export const AppointmentFormModal = ({
           motivo: 'Visita Generale',
           stato: 'Prenotato',
           note: ''
-        }));
+        });
       }
       setError('');
     }
-  }, [isOpen, defaultDate, defaultTime, defaultPet, initialData, activeClinic, user]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -227,7 +235,7 @@ export const AppointmentFormModal = ({
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1250 }}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px' }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px', width: '100%', overflow: 'hidden' }}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <div
@@ -251,8 +259,8 @@ export const AppointmentFormModal = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-          <div className="modal-body">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', minWidth: 0 }}>
+          <div className="modal-body" style={{ overflowX: 'hidden' }}>
             {error && (
               <div
                 style={{
@@ -275,7 +283,8 @@ export const AppointmentFormModal = ({
                 <CustomSelect
                   id="apt-select-owner"
                   value={selectedOwnerId}
-                  onChange={(val) => {
+                  onChange={(e) => {
+                    const val = unwrapVal(e);
                     setSelectedOwnerId(val);
                     const ownerPets = pets.filter((p) => (p.proprietarioId?._id || p.proprietarioId)?.toString() === val?.toString());
                     const firstPet = ownerPets[0];
@@ -295,7 +304,8 @@ export const AppointmentFormModal = ({
                 <CustomSelect
                   id="apt-select-pet"
                   value={formData.animaleId}
-                  onChange={(val) => {
+                  onChange={(e) => {
+                    const val = unwrapVal(e);
                     const chosen = pets.find((p) => p._id === val);
                     setFormData((prev) => ({
                       ...prev,
@@ -304,8 +314,8 @@ export const AppointmentFormModal = ({
                     }));
                   }}
                   options={petOptions}
-                  placeholder={selectedOwnerId ? '2. Seleziona paziente...' : 'Seleziona prima il proprietario...'}
-                  disabled={!selectedOwnerId && petOptions.length === 0}
+                  placeholder={selectedOwnerId ? (petOptions.length > 0 ? '2. Seleziona paziente...' : 'Nessun paziente associato') : 'Seleziona prima il proprietario...'}
+                  disabled={!selectedOwnerId || petOptions.length === 0}
                 />
               </div>
             </div>
@@ -347,10 +357,14 @@ export const AppointmentFormModal = ({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    minHeight: '42px'
+                    minHeight: '42px',
+                    minWidth: 0,
+                    overflow: 'hidden'
                   }}
                 >
-                  <span style={{ fontWeight: 600 }}>{activeClinic?.nome || 'Ambulatorio Attivo'}</span>
+                  <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {activeClinic?.nome || 'Ambulatorio Attivo'}
+                  </span>
                   <span
                     style={{
                       fontSize: '0.72rem',
@@ -358,7 +372,9 @@ export const AppointmentFormModal = ({
                       borderRadius: '9999px',
                       background: 'rgba(13, 148, 136, 0.12)',
                       color: 'var(--primary)',
-                      fontWeight: 600
+                      fontWeight: 600,
+                      flexShrink: 0,
+                      marginLeft: '0.5rem'
                     }}
                   >
                     Attivo
@@ -374,7 +390,10 @@ export const AppointmentFormModal = ({
                 <CustomSelect
                   id="apt-select-vet"
                   value={formData.veterinarioId}
-                  onChange={(val) => setFormData((prev) => ({ ...prev, veterinarioId: val }))}
+                  onChange={(e) => {
+                    const val = unwrapVal(e);
+                    setFormData((prev) => ({ ...prev, veterinarioId: val }));
+                  }}
                   options={vetOptions}
                   placeholder="Seleziona medico veterinario..."
                 />
@@ -413,7 +432,10 @@ export const AppointmentFormModal = ({
                 <CustomSelect
                   id="apt-select-duration"
                   value={formData.durataMinuti}
-                  onChange={(val) => setFormData((prev) => ({ ...prev, durataMinuti: Number(val) }))}
+                  onChange={(e) => {
+                    const val = unwrapVal(e);
+                    setFormData((prev) => ({ ...prev, durataMinuti: Number(val) }));
+                  }}
                   options={durationOptions}
                   searchable={false}
                 />
@@ -427,13 +449,14 @@ export const AppointmentFormModal = ({
                 <CustomSelect
                   id="apt-select-motivo"
                   value={formData.motivo}
-                  onChange={(val) =>
+                  onChange={(e) => {
+                    const val = unwrapVal(e);
                     setFormData((prev) => ({
                       ...prev,
                       motivo: val,
                       tipoPrestazione: val
-                    }))
-                  }
+                    }));
+                  }}
                   options={prestazioneOptions}
                 />
               </div>
@@ -443,7 +466,10 @@ export const AppointmentFormModal = ({
                 <CustomSelect
                   id="apt-select-stato"
                   value={formData.stato}
-                  onChange={(val) => setFormData((prev) => ({ ...prev, stato: val }))}
+                  onChange={(e) => {
+                    const val = unwrapVal(e);
+                    setFormData((prev) => ({ ...prev, stato: val }));
+                  }}
                   options={statoOptions}
                   searchable={false}
                 />

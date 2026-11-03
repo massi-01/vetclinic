@@ -22,6 +22,8 @@ import { useClinic } from '../../context/ClinicContext';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { CustomSelect } from '../common/CustomSelect';
+
+const unwrapVal = (e) => (e && typeof e === 'object' && e.target ? e.target.value : (e && typeof e === 'object' && 'value' in e ? e.value : e));
 import { VisitReportModal } from './VisitReportModal';
 
 // Arrotonda l'orario alla mezz'ora più vicina (:00 o :30)
@@ -447,7 +449,8 @@ export const VisitFormModal = ({
                   id="visit-select-owner"
                   value={selectedOwnerId}
                   onChange={(val) => {
-                    setSelectedOwnerId(val);
+                    const actualVal = unwrapVal(val);
+                    setSelectedOwnerId(actualVal);
                     const ownerPets = pets.filter((p) => (p.proprietarioId?._id || p.proprietarioId)?.toString() === val?.toString());
                     const firstPet = ownerPets[0];
                     setFormData((prev) => ({
@@ -471,7 +474,7 @@ export const VisitFormModal = ({
                     const sel = pets.find((p) => p._id === val);
                     setFormData((prev) => ({
                       ...prev,
-                      animaleId: val,
+                      animaleId: unwrapVal(val),
                       pesoRilevato: sel?.pesoAttuale || prev.pesoRilevato
                     }));
                   }}
@@ -490,7 +493,7 @@ export const VisitFormModal = ({
                   id="visit-select-veterinario"
                   name="veterinarioId"
                   value={formData.veterinarioId}
-                  onChange={(val) => setFormData((prev) => ({ ...prev, veterinarioId: val }))}
+                  onChange={(val) => setFormData((prev) => ({ ...prev, veterinarioId: unwrapVal(val) }))}
                   options={vetOptions}
                   placeholder="Seleziona medico veterinario..."
                 />
@@ -502,7 +505,7 @@ export const VisitFormModal = ({
                   id="visit-select-tipo"
                   name="tipoVisita"
                   value={formData.tipoVisita}
-                  onChange={(val) => setFormData((prev) => ({ ...prev, tipoVisita: val }))}
+                  onChange={(val) => setFormData((prev) => ({ ...prev, tipoVisita: unwrapVal(val) }))}
                   options={tipoVisitaOptions}
                   placeholder="Seleziona tipo visita..."
                 />
@@ -554,7 +557,7 @@ export const VisitFormModal = ({
                 <CustomSelect
                   id="visit-select-stato"
                   value={formData.stato}
-                  onChange={(val) => setFormData((prev) => ({ ...prev, stato: val }))}
+                  onChange={(val) => setFormData((prev) => ({ ...prev, stato: unwrapVal(val) }))}
                   options={statoVisitaOptions}
                   placeholder="Seleziona stato..."
                 />

@@ -32,7 +32,17 @@ export const CustomSelect = ({
     };
   });
 
-  const selectedOption = normalizedOptions.find((opt) => String(opt.value) === String(value));
+  const resolveValue = (v) => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'object') {
+      if ('value' in v && typeof v.value !== 'object') return v.value;
+      if (v.target && 'value' in v.target) return v.target.value;
+    }
+    return v;
+  };
+
+  const currentVal = resolveValue(value);
+  const selectedOption = normalizedOptions.find((opt) => String(opt.value) === String(currentVal));
 
   // Determine if search is shown
   const isSearchEnabled = searchable !== undefined ? searchable : normalizedOptions.length > 6;
@@ -72,7 +82,18 @@ export const CustomSelect = ({
   }, [isOpen, isSearchEnabled]);
 
   const handleSelect = (optVal) => {
-    onChange({ target: { name: name || id, value: optVal } });
+    if (typeof onChange === 'function') {
+      const event = {
+        target: { name: name || id, value: optVal },
+        currentTarget: { name: name || id, value: optVal },
+        value: optVal,
+        toString: () => String(optVal),
+        valueOf: () => optVal,
+        toJSON: () => optVal,
+        [Symbol.toPrimitive]: (hint) => (hint === 'number' ? Number(optVal) : String(optVal))
+      };
+      onChange(event);
+    }
     setIsOpen(false);
     setSearchTerm('');
   };
@@ -81,16 +102,24 @@ export const CustomSelect = ({
     <div
       ref={containerRef}
       className={`custom-select-container ${className}`}
-      style={{ position: 'relative', width: '100%', ...style }}
+      onMouseDown={(e) => e.stopPropagation()}
+      style={{
+        position: 'relative',
+        width: '100%',
+        minWidth: 0,
+        zIndex: isOpen ? 1000 : 'auto',
+        ...style
+      }}
     >
       <button
         type="button"
         id={id}
         name={name}
         disabled={disabled}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={() => !disabled && setIsOpen((prev) => !prev)}
         style={{
           width: '100%',
+          minWidth: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -104,7 +133,8 @@ export const CustomSelect = ({
           cursor: disabled ? 'not-allowed' : 'pointer',
           boxShadow: isOpen ? '0 0 0 3px rgba(13, 148, 136, 0.15)' : 'none',
           transition: 'all 0.15s ease',
-          outline: 'none'
+          outline: 'none',
+          overflow: 'hidden'
         }}
       >
         <span
@@ -114,23 +144,47 @@ export const CustomSelect = ({
             gap: '0.5rem',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
+            whiteSpace: 'nowrap',
+            minWidth: 0,
+            flex: 1
           }}
         >
           {selectedOption ? (
             <>
               {selectedOption.icon}
-              <span style={{ fontWeight: 500, color: 'var(--text-main, #0f172a)' }}>
+              <span
+                style={{
+                  fontWeight: 500,
+                  color: 'var(--text-main, #0f172a)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  maxWidth: '100%'
+                }}
+              >
                 {selectedOption.label}
               </span>
               {selectedOption.sublabel && (
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)' }}>
+                <span
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-muted, #64748b)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    flex: 1,
+                    minWidth: 0
+                  }}
+                >
                   ({selectedOption.sublabel})
                 </span>
               )}
             </>
           ) : (
-            <span>{placeholder}</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {placeholder}
+            </span>
           )}
         </span>
         <ChevronDown
@@ -222,7 +276,7 @@ export const CustomSelect = ({
               </div>
             ) : (
               filteredOptions.map((opt) => {
-                const isSelected = String(opt.value) === String(value);
+                const isSelected = String(opt.value) === String(currentVal);
                 return (
                   <div
                     key={String(opt.value)}
@@ -246,12 +300,12 @@ export const CustomSelect = ({
                       if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, overflow: 'hidden' }}>
                       {opt.icon}
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        <div>{opt.label}</div>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</div>
                         {opt.sublabel && (
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', fontWeight: 400 }}>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {opt.sublabel}
                           </div>
                         )}

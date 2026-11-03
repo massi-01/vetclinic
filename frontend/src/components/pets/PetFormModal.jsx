@@ -4,6 +4,8 @@ import { useClinic } from '../../context/ClinicContext';
 import { api } from '../../services/api';
 import { CustomSelect } from '../common/CustomSelect';
 
+const unwrapVal = (e) => (e && typeof e === 'object' && e.target ? e.target.value : (e && typeof e === 'object' && 'value' in e ? e.value : e));
+
 export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, defaultOwnerId = null }) => {
   const { activeClinic, clinics } = useClinic();
   const [owners, setOwners] = useState([]);
@@ -244,7 +246,7 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
                 <CustomSelect
                   value={formData.specie}
                   options={specieOptions}
-                  onChange={(val) => setFormData({ ...formData, specie: val })}
+                  onChange={(val) => setFormData({ ...formData, specie: unwrapVal(val) })}
                   placeholder="Seleziona Specie..."
                 />
               </div>
@@ -268,7 +270,7 @@ export const PetFormModal = ({ isOpen, onClose, onPetSaved, initialData = null, 
                 <CustomSelect
                   value={formData.sesso}
                   options={sessoOptions}
-                  onChange={(val) => setFormData({ ...formData, sesso: val })}
+                  onChange={(val) => setFormData({ ...formData, sesso: unwrapVal(val) })}
                   placeholder="Seleziona Sesso..."
                 />
               </div>
