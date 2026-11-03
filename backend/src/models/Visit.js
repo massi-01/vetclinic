@@ -13,7 +13,7 @@ const visitSchema = new mongoose.Schema(
     },
     tipoVisita: {
       type: String,
-      enum: ['Controllo Generale', 'Vaccinazione', 'Pronto Soccorso', 'Chirurgia', 'Visita Specialistica', 'Altro'],
+      enum: ['Controllo Generale', 'Visita Generale', 'Vaccinazione', 'Pronto Soccorso', 'Chirurgia', 'Visita Specialistica', 'Ecografia/Diagnostica', 'Controllo Post-Operatorio', 'Altro'],
       default: 'Controllo Generale'
     },
     motivo: {

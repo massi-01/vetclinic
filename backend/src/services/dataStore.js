@@ -500,6 +500,32 @@ export const initSeedData = async () => {
 // HELPER: Verifica se Mongo è attivo
 const shouldUseMongo = () => mongoose.connection.readyState === 1;
 
+// HELPER: Mappatura stati e tipologie tra Appuntamenti (Agenda) e Visite Cliniche
+const mapAppStatusToVisitStatus = (status) => {
+  switch (status) {
+    case 'Completato': return 'Completata';
+    case 'In Visita': return 'In corso';
+    case 'Annullato': return 'Annullata';
+    default: return 'Prenotata';
+  }
+};
+
+const mapAppTypeToVisitType = (type) => {
+  switch (type) {
+    case 'Visita Generale': return 'Controllo Generale';
+    case 'Vaccinazione':
+    case 'Vaccinazione / Richiamo': return 'Vaccinazione';
+    case 'Chirurgia':
+    case 'Chirurgia programmata': return 'Chirurgia';
+    case 'Controllo Post-Operatorio': return 'Controllo Generale';
+    case 'Ecografia/Diagnostica':
+    case 'Esami Sangue / Diagnostica':
+    case 'Dermatologia / Orecchie': return 'Visita Specialistica';
+    case 'Emergenza / Urgenza': return 'Pronto Soccorso';
+    default: return type || 'Controllo Generale';
+  }
+};
+
 // DATA ACCESS LAYER
 export const dataStore = {
   // === UTENTI / VETERINARI ===
@@ -2028,7 +2054,7 @@ export const dataStore = {
         const visit = new Visit({
           data: appData.data,
           ora: appData.oraInizio || '10:00',
-          tipoVisita: appData.tipoPrestazione || 'Controllo Generale',
+          tipoVisita: mapAppTypeToVisitType(appData.tipoPrestazione || appData.motivo),
           motivo: appData.motivo || 'Appuntamento da Agenda',
           stato: mapAppStatusToVisitStatus(appData.stato),
           animaleId: appData.animaleId,
@@ -2073,7 +2099,7 @@ export const dataStore = {
         _id: generateId(),
         data: appData.data,
         ora: appData.oraInizio || '10:00',
-        tipoVisita: appData.tipoPrestazione || 'Controllo Generale',
+        tipoVisita: mapAppTypeToVisitType(appData.tipoPrestazione || appData.motivo),
         motivo: appData.motivo || 'Appuntamento da Agenda',
         stato: mapAppStatusToVisitStatus(appData.stato),
         animaleId: appData.animaleId,
@@ -2132,6 +2158,7 @@ export const dataStore = {
         if (updateData.data) visitUpdates.data = updateData.data;
         if (updateData.oraInizio) visitUpdates.ora = updateData.oraInizio;
         if (updateData.motivo) visitUpdates.motivo = updateData.motivo;
+        if (updateData.tipoPrestazione) visitUpdates.tipoVisita = mapAppTypeToVisitType(updateData.tipoPrestazione);
         if (updateData.stato) {
           const mapAppStatusToVisitStatus = (status) => {
             switch (status) {
@@ -2176,6 +2203,7 @@ export const dataStore = {
         if (updateData.data) memoryData.visits[vIdx].data = updateData.data;
         if (updateData.oraInizio) memoryData.visits[vIdx].ora = updateData.oraInizio;
         if (updateData.motivo) memoryData.visits[vIdx].motivo = updateData.motivo;
+        if (updateData.tipoPrestazione) memoryData.visits[vIdx].tipoVisita = mapAppTypeToVisitType(updateData.tipoPrestazione);
         if (updateData.stato) {
           const mapAppStatusToVisitStatus = (status) => {
             switch (status) {
